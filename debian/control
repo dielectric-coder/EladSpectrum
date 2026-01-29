@@ -1,7 +1,7 @@
 Source: elad-spectrum
 Section: hamradio
 Priority: optional
-Maintainer: Mikel <mikel@example.com>
+Maintainer: Michel, VE2EXB <ve2exb@mikelachaine.ca>
 Build-Depends: debhelper-compat (= 13),
                meson,
                ninja-build,
