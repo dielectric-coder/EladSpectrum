@@ -31,6 +31,18 @@ This application provides a spectrum analyzer and waterfall display using the RF
 sudo apt install libgtk-4-dev libusb-1.0-0-dev libfftw3-dev meson ninja-build
 ```
 
+### Raspberry Pi CM5
+
+```bash
+sudo apt install libgtk-4-dev libusb-1.0-0-dev libfftw3-dev meson ninja-build
+```
+
+On Raspberry Pi OS, you may also need:
+
+```bash
+sudo apt install libwayland-dev libxkbcommon-dev
+```
+
 ## Build
 
 ```bash
@@ -64,6 +76,16 @@ meson compile -C build
 | `-f, --fullscreen` | Start in fullscreen mode |
 | `-p, --pi` | Set window size to 800x480 (5" LCD) |
 | `-h, --help` | Show help message |
+
+### Raspberry Pi Usage
+
+The `-p` and `-f` options are designed for running on a Raspberry Pi with a small display. For embedded use with a 5" LCD (800x480), use both options together:
+
+```bash
+./build/elad-spectrum -p -f
+```
+
+This provides a fullscreen interface optimized for the Pi's display size.
 
 ## Hardware Requirements
 
