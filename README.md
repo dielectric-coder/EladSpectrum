@@ -1,6 +1,6 @@
-# Elad Server
+# Elad Spectrum
 
-A standalone server application for the Elad FDM-DUO Software Defined Radio transceiver.
+A spectrum analyzer application for the Elad FDM-DUO Software Defined Radio transceiver.
 
 > **Note:** This project is a work in progress.
 
