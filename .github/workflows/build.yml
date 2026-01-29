@@ -47,7 +47,7 @@ jobs:
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: aarch64
-          distro: ubuntu24.04
+          distro: bookworm
           githubToken: ${{ github.token }}
           install: |
             apt-get update
