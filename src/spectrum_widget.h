@@ -1,0 +1,32 @@
+#ifndef SPECTRUM_WIDGET_H
+#define SPECTRUM_WIDGET_H
+
+#include <gtk/gtk.h>
+#include "app_state.h"
+
+G_BEGIN_DECLS
+
+#define SPECTRUM_TYPE_WIDGET (spectrum_widget_get_type())
+G_DECLARE_FINAL_TYPE(SpectrumWidget, spectrum_widget, SPECTRUM, WIDGET, GtkDrawingArea)
+
+// Create a new spectrum widget
+GtkWidget *spectrum_widget_new(void);
+
+// Update spectrum data (thread-safe, copies data)
+void spectrum_widget_update(SpectrumWidget *widget, const float *spectrum_db, int size);
+
+// Set display range
+void spectrum_widget_set_range(SpectrumWidget *widget, float min_db, float max_db);
+
+// Set center frequency for display
+void spectrum_widget_set_center_freq(SpectrumWidget *widget, int freq_hz);
+
+// Set sample rate for frequency axis
+void spectrum_widget_set_sample_rate(SpectrumWidget *widget, int sample_rate);
+
+// Set overlay text (frequency and mode) displayed on top of spectrum
+void spectrum_widget_set_overlay(SpectrumWidget *widget, const char *freq_str, const char *mode_str);
+
+G_END_DECLS
+
+#endif // SPECTRUM_WIDGET_H

@@ -1,0 +1,256 @@
+#include "waterfall_widget.h"
+#include <string.h>
+#include <math.h>
+
+// Must match spectrum_widget.c margins
+#define MARGIN_LEFT 55
+
+struct _WaterfallWidget {
+    GtkDrawingArea parent_instance;
+
+    // Waterfall data (ring buffer of spectrum lines)
+    GMutex data_mutex;
+    uint8_t *waterfall_data;  // RGB data for each line
+    int spectrum_size;
+    int num_lines;
+    int current_line;  // Index of next line to write
+
+    // Cairo surface for direct rendering
+    cairo_surface_t *surface;
+    int surface_width;
+    int surface_height;
+
+    // Display parameters
+    float min_db;
+    float max_db;
+};
+
+G_DEFINE_TYPE(WaterfallWidget, waterfall_widget, GTK_TYPE_DRAWING_AREA)
+
+// Color map: converts dB value (0.0 to 1.0 normalized) to RGB
+static void db_to_color(float normalized, uint8_t *r, uint8_t *g, uint8_t *b) {
+    // Color gradient: black -> blue -> cyan -> green -> yellow -> red -> white
+    if (normalized < 0.0f) normalized = 0.0f;
+    if (normalized > 1.0f) normalized = 1.0f;
+
+    if (normalized < 0.2f) {
+        // Black to blue
+        float t = normalized / 0.2f;
+        *r = 0;
+        *g = 0;
+        *b = (uint8_t)(t * 255);
+    } else if (normalized < 0.4f) {
+        // Blue to cyan
+        float t = (normalized - 0.2f) / 0.2f;
+        *r = 0;
+        *g = (uint8_t)(t * 255);
+        *b = 255;
+    } else if (normalized < 0.6f) {
+        // Cyan to green
+        float t = (normalized - 0.4f) / 0.2f;
+        *r = 0;
+        *g = 255;
+        *b = (uint8_t)((1.0f - t) * 255);
+    } else if (normalized < 0.8f) {
+        // Green to yellow
+        float t = (normalized - 0.6f) / 0.2f;
+        *r = (uint8_t)(t * 255);
+        *g = 255;
+        *b = 0;
+    } else {
+        // Yellow to red
+        float t = (normalized - 0.8f) / 0.2f;
+        *r = 255;
+        *g = (uint8_t)((1.0f - t) * 255);
+        *b = 0;
+    }
+}
+
+// Lines per second: 192000 / 4096 / 3 = 15.625
+#define LINES_PER_SECOND 15.625f
+
+static void waterfall_widget_draw(GtkDrawingArea *area, cairo_t *cr,
+                                   int width, int height, gpointer user_data G_GNUC_UNUSED) {
+    WaterfallWidget *self = WATERFALL_WIDGET(area);
+
+    // Black background
+    cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
+    cairo_paint(cr);
+
+    // Calculate plot area (matching spectrum widget)
+    int plot_width = width - MARGIN_LEFT;
+    if (plot_width <= 0 || height <= 0) return;
+
+    g_mutex_lock(&self->data_mutex);
+
+    // Check if we need to recreate surface (size changed)
+    if (self->surface && (self->surface_width != plot_width || self->surface_height != height)) {
+        cairo_surface_destroy(self->surface);
+        self->surface = NULL;
+    }
+
+    // Create surface if needed (only for plot area)
+    if (!self->surface && plot_width > 0 && height > 0) {
+        self->surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24, plot_width, height);
+        self->surface_width = plot_width;
+        self->surface_height = height;
+        // Clear to black
+        cairo_t *surface_cr = cairo_create(self->surface);
+        cairo_set_source_rgb(surface_cr, 0, 0, 0);
+        cairo_paint(surface_cr);
+        cairo_destroy(surface_cr);
+    }
+
+    // Draw the surface at margin offset
+    if (self->surface) {
+        cairo_set_source_surface(cr, self->surface, MARGIN_LEFT, 0);
+        cairo_paint(cr);
+    }
+
+    g_mutex_unlock(&self->data_mutex);
+
+    // Draw time labels in left margin
+    cairo_select_font_face(cr, "monospace", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 10);
+    cairo_set_source_rgba(cr, 0.7, 0.7, 0.7, 1.0);
+
+    // Calculate total time span visible
+    float total_seconds = height / LINES_PER_SECOND;
+
+    // Draw time labels at regular intervals
+    int num_labels = 5;
+    for (int i = 0; i <= num_labels; i++) {
+        double y = (double)i / num_labels * height;
+        float seconds = (float)i / num_labels * total_seconds;
+
+        char label[16];
+        if (seconds < 60) {
+            snprintf(label, sizeof(label), "%.0fs", seconds);
+        } else {
+            int mins = (int)(seconds / 60);
+            int secs = (int)seconds % 60;
+            snprintf(label, sizeof(label), "%d:%02d", mins, secs);
+        }
+        cairo_move_to(cr, 5, y + 4);
+        cairo_show_text(cr, label);
+    }
+}
+
+static void waterfall_widget_finalize(GObject *object) {
+    WaterfallWidget *self = WATERFALL_WIDGET(object);
+
+    g_mutex_clear(&self->data_mutex);
+    g_free(self->waterfall_data);
+    if (self->surface) {
+        cairo_surface_destroy(self->surface);
+    }
+
+    G_OBJECT_CLASS(waterfall_widget_parent_class)->finalize(object);
+}
+
+static void waterfall_widget_class_init(WaterfallWidgetClass *klass) {
+    GObjectClass *object_class = G_OBJECT_CLASS(klass);
+    object_class->finalize = waterfall_widget_finalize;
+}
+
+static void waterfall_widget_init(WaterfallWidget *self) {
+    g_mutex_init(&self->data_mutex);
+    self->waterfall_data = NULL;
+    self->spectrum_size = 0;
+    self->num_lines = WATERFALL_LINES;
+    self->current_line = 0;
+    self->surface = NULL;
+    self->surface_width = 0;
+    self->surface_height = 0;
+    self->min_db = -120.0f;
+    self->max_db = 0.0f;
+
+    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(self), waterfall_widget_draw, NULL, NULL);
+}
+
+GtkWidget *waterfall_widget_new(void) {
+    return g_object_new(WATERFALL_TYPE_WIDGET, NULL);
+}
+
+void waterfall_widget_add_line(WaterfallWidget *widget, const float *spectrum_db, int size) {
+    if (!widget || !spectrum_db || size <= 0) return;
+
+    g_mutex_lock(&widget->data_mutex);
+
+    widget->spectrum_size = size;
+
+    // If we have a surface, scroll it down and draw new line at top using direct pixel access
+    if (widget->surface) {
+        int width = widget->surface_width;
+        int height = widget->surface_height;
+
+        // Flush any pending Cairo operations
+        cairo_surface_flush(widget->surface);
+
+        // Get direct access to pixel data
+        unsigned char *data = cairo_image_surface_get_data(widget->surface);
+        int stride = cairo_image_surface_get_stride(widget->surface);
+
+        // Scroll down: move all rows down by 1 (from bottom to top to avoid overlap)
+        // memmove handles overlapping regions correctly
+        if (height > 1) {
+            memmove(data + stride, data, stride * (height - 1));
+        }
+
+        // Draw new line at top (row 0) - RGB24 format is 0xXXRRGGBB (little-endian: BB GG RR XX)
+        float range = widget->max_db - widget->min_db;
+        if (range < 1.0f) range = 1.0f;
+
+        uint32_t *row = (uint32_t *)data;
+        for (int x = 0; x < width; x++) {
+            // Map x to spectrum bin
+            int bin = x * size / width;
+            if (bin >= size) bin = size - 1;
+
+            float db = spectrum_db[bin];
+            if (db < widget->min_db) db = widget->min_db;
+            if (db > widget->max_db) db = widget->max_db;
+
+            float normalized = (db - widget->min_db) / range;
+
+            uint8_t r, g, b;
+            db_to_color(normalized, &r, &g, &b);
+
+            // RGB24 format: 0x00RRGGBB
+            row[x] = ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+        }
+
+        // Mark surface as modified
+        cairo_surface_mark_dirty(widget->surface);
+    }
+
+    g_mutex_unlock(&widget->data_mutex);
+
+    // Request redraw
+    gtk_widget_queue_draw(GTK_WIDGET(widget));
+}
+
+void waterfall_widget_set_range(WaterfallWidget *widget, float min_db, float max_db) {
+    if (!widget) return;
+    widget->min_db = min_db;
+    widget->max_db = max_db;
+}
+
+void waterfall_widget_clear(WaterfallWidget *widget) {
+    if (!widget) return;
+
+    g_mutex_lock(&widget->data_mutex);
+    if (widget->waterfall_data) {
+        memset(widget->waterfall_data, 0, widget->spectrum_size * 3 * widget->num_lines);
+    }
+    if (widget->surface) {
+        cairo_t *cr = cairo_create(widget->surface);
+        cairo_set_source_rgb(cr, 0, 0, 0);
+        cairo_paint(cr);
+        cairo_destroy(cr);
+    }
+    widget->current_line = 0;
+    g_mutex_unlock(&widget->data_mutex);
+
+    gtk_widget_queue_draw(GTK_WIDGET(widget));
+}

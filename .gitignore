@@ -1,0 +1,16 @@
+# Build directory
+build/
+
+# Editor files
+*.swp
+*~
+.vscode/
+.idea/
+
+# Compiled objects
+*.o
+*.so
+*.a
+
+# Debug files
+*.log

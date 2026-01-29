@@ -1,0 +1,7 @@
+all: main
+
+main: main.c
+	gcc -Wall --pedantic -o main main.c -lusb-1.0 -lm
+
+clean: 
+	rm main

@@ -1,0 +1,7 @@
+all: elad-gqrx
+
+elad-gqrx: elad-gqrx.c
+	gcc -Wall -o elad-gqrx elad-gqrx.c -lusb-1.0 -lm -lpthread
+
+clean: 
+	rm elad-gqrx

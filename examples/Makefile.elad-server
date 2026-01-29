@@ -1,0 +1,7 @@
+all: elad-server
+
+elad-server: elad-server.c
+	gcc -Wall -o elad-server elad-server.c -lpthread -lm
+
+clean: 
+	rm elad-server

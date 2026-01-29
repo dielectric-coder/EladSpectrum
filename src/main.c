@@ -1,0 +1,412 @@
+#define _DEFAULT_SOURCE
+#include <gtk/gtk.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "app_state.h"
+#include "usb_device.h"
+#include "fft_processor.h"
+#include "spectrum_widget.h"
+#include "waterfall_widget.h"
+#include "cat_control.h"
+
+// Application state
+typedef struct {
+    GtkApplication *app;
+    GtkWidget *window;
+    GtkWidget *spectrum;
+    GtkWidget *spectrum_frame;
+    GtkWidget *waterfall;
+    GtkWidget *status_label;
+    GtkAdjustment *ref_adj;
+    GtkAdjustment *range_adj;
+
+    usb_device_t *usb;
+    fft_processor_t *fft;
+    cat_control_t *cat;
+
+    pthread_t usb_thread;
+    atomic_int running;
+    atomic_int usb_connected;
+
+    // Latest spectrum for display update
+    GMutex spectrum_mutex;
+    float spectrum_db[FFT_SIZE];
+    atomic_int spectrum_ready;
+
+    int center_freq_hz;
+    elad_mode_t current_mode;
+    int current_vfo;  // 0=VFO A, 1=VFO B
+    int freq_poll_counter;
+
+    // Command-line options
+    gboolean fullscreen;
+    int window_width;
+    int window_height;
+} app_data_t;
+
+static app_data_t app;
+
+// USB data callback - called from USB thread
+static void usb_data_callback(const uint8_t *data, int length, void *user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+
+    // Process data through FFT
+    if (fft_processor_process(app_data->fft, data, length)) {
+        // New spectrum ready - copy to shared buffer
+        g_mutex_lock(&app_data->spectrum_mutex);
+        fft_processor_get_spectrum_db(app_data->fft, app_data->spectrum_db);
+        atomic_store(&app_data->spectrum_ready, 1);
+        g_mutex_unlock(&app_data->spectrum_mutex);
+    }
+}
+
+// USB thread function
+static void *usb_thread_func(void *user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+
+    fprintf(stderr, "USB thread started\n");
+
+    while (atomic_load(&app_data->running)) {
+        if (!usb_device_is_open(app_data->usb)) {
+            // Try to open device
+            if (usb_device_open(app_data->usb) == 0) {
+                atomic_store(&app_data->usb_connected, 1);
+
+                // Read current frequency from radio (don't change it)
+                long freq = usb_device_get_frequency(app_data->usb);
+                if (freq > 0) {
+                    app_data->center_freq_hz = (int)freq;
+                    fprintf(stderr, "Radio frequency: %ld Hz\n", freq);
+                }
+
+                // Start streaming
+                if (usb_device_start_streaming(app_data->usb, usb_data_callback, app_data) != 0) {
+                    fprintf(stderr, "Failed to start streaming\n");
+                    usb_device_close(app_data->usb);
+                    atomic_store(&app_data->usb_connected, 0);
+                }
+            } else {
+                // Device not found, wait and retry
+                usleep(1000000);  // 1 second
+                continue;
+            }
+        }
+
+        // Handle USB events
+        int res = usb_device_handle_events(app_data->usb);
+        if (res < 0) {
+            fprintf(stderr, "USB error: %d\n", res);
+            usb_device_close(app_data->usb);
+            atomic_store(&app_data->usb_connected, 0);
+        }
+    }
+
+    // Cleanup
+    usb_device_stop_streaming(app_data->usb);
+    usb_device_close(app_data->usb);
+
+    fprintf(stderr, "USB thread stopped\n");
+    return NULL;
+}
+
+// Display refresh timer callback - called from GTK main thread
+static gboolean refresh_display(gpointer user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+
+    if (!atomic_load(&app_data->running)) {
+        return G_SOURCE_REMOVE;
+    }
+
+    // Update status
+    if (atomic_load(&app_data->usb_connected)) {
+        gtk_label_set_text(GTK_LABEL(app_data->status_label), "Connected");
+    } else {
+        gtk_label_set_text(GTK_LABEL(app_data->status_label), "Searching for device...");
+    }
+
+    // Poll frequency and mode from radio every ~10 frames (~300ms)
+    app_data->freq_poll_counter++;
+    if (app_data->freq_poll_counter >= 10 && atomic_load(&app_data->usb_connected)) {
+        app_data->freq_poll_counter = 0;
+
+        // Read frequency, mode and VFO via CAT serial port
+        long freq;
+        elad_mode_t mode;
+        int vfo;
+        if (cat_control_is_open(app_data->cat) &&
+            cat_control_get_freq_mode(app_data->cat, &freq, &mode, &vfo) == 0) {
+
+            gboolean freq_changed = (freq > 0 && freq != app_data->center_freq_hz);
+            gboolean mode_changed = (mode != app_data->current_mode);
+            gboolean vfo_changed = (vfo != app_data->current_vfo);
+
+            if (freq_changed) {
+                app_data->center_freq_hz = (int)freq;
+
+                // Update spectrum display
+                spectrum_widget_set_center_freq(SPECTRUM_WIDGET(app_data->spectrum), app_data->center_freq_hz);
+            }
+
+            if (mode_changed) {
+                app_data->current_mode = mode;
+            }
+
+            if (vfo_changed) {
+                app_data->current_vfo = vfo;
+
+                // Update spectrum frame label
+                gtk_frame_set_label(GTK_FRAME(app_data->spectrum_frame),
+                                    vfo == 0 ? "VFO A" : "VFO B");
+            }
+
+            // Update overlay with frequency and mode
+            if (freq_changed || mode_changed) {
+                char freq_str[32];
+                snprintf(freq_str, sizeof(freq_str), "%.6f MHz", app_data->center_freq_hz / 1e6);
+                spectrum_widget_set_overlay(SPECTRUM_WIDGET(app_data->spectrum),
+                                            freq_str, usb_device_mode_name(app_data->current_mode));
+            }
+        }
+    }
+
+    // Check if new spectrum data is available
+    if (atomic_exchange(&app_data->spectrum_ready, 0)) {
+        float spectrum_copy[FFT_SIZE];
+
+        g_mutex_lock(&app_data->spectrum_mutex);
+        memcpy(spectrum_copy, app_data->spectrum_db, sizeof(spectrum_copy));
+        g_mutex_unlock(&app_data->spectrum_mutex);
+
+        // Update display widgets
+        spectrum_widget_update(SPECTRUM_WIDGET(app_data->spectrum), spectrum_copy, FFT_SIZE);
+        waterfall_widget_add_line(WATERFALL_WIDGET(app_data->waterfall), spectrum_copy, FFT_SIZE);
+    }
+
+    return G_SOURCE_CONTINUE;
+}
+
+// Range changed callback
+static void on_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+    float ref_db = (float)gtk_adjustment_get_value(app_data->ref_adj);
+    float range_db = (float)gtk_adjustment_get_value(app_data->range_adj);
+    float min_db = ref_db - range_db;
+
+    spectrum_widget_set_range(SPECTRUM_WIDGET(app_data->spectrum), min_db, ref_db);
+    waterfall_widget_set_range(WATERFALL_WIDGET(app_data->waterfall), min_db, ref_db);
+}
+
+// Window close handler
+static gboolean on_window_close(GtkWindow *window G_GNUC_UNUSED, gpointer user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+
+    // Signal USB thread to stop
+    atomic_store(&app_data->running, 0);
+
+    // Wait for USB thread
+    pthread_join(app_data->usb_thread, NULL);
+
+    return FALSE;  // Allow window to close
+}
+
+static void activate(GtkApplication *gtk_app, gpointer user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+
+    // Create main window
+    app_data->window = gtk_application_window_new(gtk_app);
+    gtk_window_set_title(GTK_WINDOW(app_data->window), "Elad FDM-DUO Spectrum");
+    gtk_window_set_default_size(GTK_WINDOW(app_data->window), app_data->window_width, app_data->window_height);
+
+    // Connect close handler
+    g_signal_connect(app_data->window, "close-request", G_CALLBACK(on_window_close), app_data);
+
+    // Main vertical box
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    gtk_widget_set_margin_start(vbox, 5);
+    gtk_widget_set_margin_end(vbox, 5);
+    gtk_widget_set_margin_top(vbox, 5);
+    gtk_widget_set_margin_bottom(vbox, 5);
+    gtk_window_set_child(GTK_WINDOW(app_data->window), vbox);
+
+    // Control bar - centered
+    GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_widget_set_halign(hbox, GTK_ALIGN_CENTER);
+    gtk_box_append(GTK_BOX(vbox), hbox);
+
+    // Reference level (max dB) control
+    GtkWidget *ref_label = gtk_label_new("Ref:");
+    gtk_box_append(GTK_BOX(hbox), ref_label);
+
+    app_data->ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
+    GtkWidget *ref_spin = gtk_spin_button_new(app_data->ref_adj, 1.0, 0);
+    g_signal_connect(app_data->ref_adj, "value-changed", G_CALLBACK(on_range_changed), app_data);
+    gtk_box_append(GTK_BOX(hbox), ref_spin);
+
+    // Range (dB span) control
+    GtkWidget *range_label = gtk_label_new("Range:");
+    gtk_box_append(GTK_BOX(hbox), range_label);
+
+    app_data->range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
+    GtkWidget *range_spin = gtk_spin_button_new(app_data->range_adj, 1.0, 0);
+    g_signal_connect(app_data->range_adj, "value-changed", G_CALLBACK(on_range_changed), app_data);
+    gtk_box_append(GTK_BOX(hbox), range_spin);
+
+    // Status label
+    app_data->status_label = gtk_label_new("Initializing...");
+    gtk_box_append(GTK_BOX(hbox), app_data->status_label);
+
+    // Paned container for spectrum and waterfall
+    GtkWidget *paned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
+    gtk_widget_set_vexpand(paned, TRUE);
+    gtk_box_append(GTK_BOX(vbox), paned);
+
+    // Spectrum widget
+    app_data->spectrum = spectrum_widget_new();
+    int spectrum_min_h = (app_data->window_height <= 480) ? 120 : 200;
+    gtk_widget_set_size_request(app_data->spectrum, -1, spectrum_min_h);
+    spectrum_widget_set_center_freq(SPECTRUM_WIDGET(app_data->spectrum), app_data->center_freq_hz);
+    spectrum_widget_set_sample_rate(SPECTRUM_WIDGET(app_data->spectrum), DEFAULT_SAMPLE_RATE);
+
+    // Set initial range from adjustments
+    float ref_db = (float)gtk_adjustment_get_value(app_data->ref_adj);
+    float range_db = (float)gtk_adjustment_get_value(app_data->range_adj);
+    spectrum_widget_set_range(SPECTRUM_WIDGET(app_data->spectrum), ref_db - range_db, ref_db);
+
+    // Set initial overlay
+    char freq_str[32];
+    snprintf(freq_str, sizeof(freq_str), "%.6f MHz", app_data->center_freq_hz / 1e6);
+    spectrum_widget_set_overlay(SPECTRUM_WIDGET(app_data->spectrum), freq_str, "---");
+
+    app_data->spectrum_frame = gtk_frame_new("VFO A");
+    gtk_frame_set_child(GTK_FRAME(app_data->spectrum_frame), app_data->spectrum);
+    gtk_paned_set_start_child(GTK_PANED(paned), app_data->spectrum_frame);
+    gtk_paned_set_resize_start_child(GTK_PANED(paned), TRUE);
+    gtk_paned_set_shrink_start_child(GTK_PANED(paned), TRUE);
+
+    // Waterfall widget
+    app_data->waterfall = waterfall_widget_new();
+    int waterfall_min_h = (app_data->window_height <= 480) ? 150 : 300;
+    gtk_widget_set_size_request(app_data->waterfall, -1, waterfall_min_h);
+    waterfall_widget_set_range(WATERFALL_WIDGET(app_data->waterfall), ref_db - range_db, ref_db);
+
+    GtkWidget *waterfall_frame = gtk_frame_new("Waterfall");
+    gtk_frame_set_child(GTK_FRAME(waterfall_frame), app_data->waterfall);
+    gtk_paned_set_end_child(GTK_PANED(paned), waterfall_frame);
+    gtk_paned_set_resize_end_child(GTK_PANED(paned), TRUE);
+    gtk_paned_set_shrink_end_child(GTK_PANED(paned), TRUE);
+
+    // Set paned position
+    // Set paned position (spectrum vs waterfall split)
+    int paned_pos = (app_data->window_height <= 480) ? 180 : 300;
+    gtk_paned_set_position(GTK_PANED(paned), paned_pos);
+
+    // Initialize USB device
+    app_data->usb = usb_device_new();
+    if (!app_data->usb) {
+        fprintf(stderr, "Failed to initialize USB\n");
+        gtk_label_set_text(GTK_LABEL(app_data->status_label), "USB init failed");
+    }
+
+    // Initialize CAT control
+    app_data->cat = cat_control_new();
+    if (app_data->cat) {
+        if (cat_control_open(app_data->cat, "/dev/ttyUSB0") != 0) {
+            fprintf(stderr, "CAT: Will retry when USB connects\n");
+        }
+    }
+
+    // Initialize FFT processor
+    app_data->fft = fft_processor_new(FFT_SIZE);
+    if (!app_data->fft) {
+        fprintf(stderr, "Failed to initialize FFT\n");
+        gtk_label_set_text(GTK_LABEL(app_data->status_label), "FFT init failed");
+    }
+
+    // Start USB thread
+    atomic_store(&app_data->running, 1);
+    atomic_store(&app_data->usb_connected, 0);
+    atomic_store(&app_data->spectrum_ready, 0);
+
+    if (pthread_create(&app_data->usb_thread, NULL, usb_thread_func, app_data) != 0) {
+        fprintf(stderr, "Failed to create USB thread\n");
+        gtk_label_set_text(GTK_LABEL(app_data->status_label), "Thread error");
+    }
+
+    // Start display refresh timer (~30 FPS)
+    g_timeout_add(33, refresh_display, app_data);
+
+    // Apply fullscreen if requested
+    if (app_data->fullscreen) {
+        gtk_window_fullscreen(GTK_WINDOW(app_data->window));
+    }
+
+    gtk_window_present(GTK_WINDOW(app_data->window));
+}
+
+static void shutdown_app(GtkApplication *gtk_app G_GNUC_UNUSED, gpointer user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+
+    // Cleanup
+    fft_processor_free(app_data->fft);
+    usb_device_free(app_data->usb);
+    cat_control_free(app_data->cat);
+    g_mutex_clear(&app_data->spectrum_mutex);
+}
+
+static void print_usage(const char *prog) {
+    fprintf(stderr, "Usage: %s [OPTIONS]\n", prog);
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "  -f, --fullscreen    Start in fullscreen mode\n");
+    fprintf(stderr, "  -p, --pi            Set window size to 800x480 (5\" LCD)\n");
+    fprintf(stderr, "  -h, --help          Show this help message\n");
+}
+
+int main(int argc, char *argv[]) {
+    // Initialize app data
+    memset(&app, 0, sizeof(app));
+    g_mutex_init(&app.spectrum_mutex);
+    app.center_freq_hz = 15300000;  // 15.3 MHz default
+    app.fullscreen = FALSE;
+    app.window_width = 1024;   // Default size
+    app.window_height = 768;
+
+    // Parse and filter command-line options (before GTK takes over)
+    int new_argc = 1;
+    char **new_argv = g_malloc(sizeof(char *) * (argc + 1));
+    new_argv[0] = argv[0];
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "--fullscreen") == 0) {
+            app.fullscreen = TRUE;
+            // Don't pass to GTK
+        } else if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--pi") == 0) {
+            app.window_width = 800;
+            app.window_height = 480;
+            // Don't pass to GTK
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0]);
+            g_free(new_argv);
+            return 0;
+        } else {
+            // Pass unknown options to GTK
+            new_argv[new_argc++] = argv[i];
+        }
+    }
+    new_argv[new_argc] = NULL;
+
+    // Create GTK application
+    app.app = gtk_application_new("org.elad.spectrum", G_APPLICATION_DEFAULT_FLAGS);
+    g_signal_connect(app.app, "activate", G_CALLBACK(activate), &app);
+    g_signal_connect(app.app, "shutdown", G_CALLBACK(shutdown_app), &app);
+
+    // Run application
+    int status = g_application_run(G_APPLICATION(app.app), new_argc, new_argv);
+
+    g_free(new_argv);
+    g_object_unref(app.app);
+    return status;
+}
