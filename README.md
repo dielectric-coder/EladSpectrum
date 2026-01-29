@@ -93,6 +93,11 @@ This provides a fullscreen interface optimized for the Pi's display size.
 - USB connection to the radio
 - Serial port access (`/dev/ttyUSB0`) for CAT control
 
+## Future Features
+
+- **USB Audio to Power Amp HAT** - Pipe USB audio from the radio to a power amplifier HAT, with optional DSP processing
+- **Network Control** - Minimal remote control of the radio via network (TBD)
+
 ## Notes
 
 - USB interfaces may require root access or udev rules for user access
