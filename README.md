@@ -1,0 +1,82 @@
+# Elad Server
+
+A standalone server application for the Elad FDM-DUO Software Defined Radio transceiver.
+
+> **Note:** This project is a work in progress.
+
+## Overview
+
+The FDM-DUO exposes three USB interfaces:
+
+1. **Sound Card** - Audio I/O for transmit/receive audio
+2. **Serial Port** - CAT (Computer Aided Transceiver) control commands
+3. **RF Data Port** - Raw sampled RF data from the antenna (typically 192 KHz bandwidth)
+
+This application provides a spectrum analyzer and waterfall display using the RF data port, with CAT control for frequency and mode synchronization.
+
+## Features
+
+- Live spectrum analyzer with 4096-point FFT
+- Waterfall display with time axis
+- CAT control via serial port (Kenwood TS-480 compatible)
+- Frequency and mode overlay display
+- VFO A/B indicator
+- Adjustable reference level and dynamic range
+
+## Dependencies
+
+### Debian/Ubuntu
+
+```bash
+sudo apt install libgtk-4-dev libusb-1.0-0-dev libfftw3-dev meson ninja-build
+```
+
+## Build
+
+```bash
+meson setup build
+meson compile -C build
+```
+
+## Run
+
+```bash
+# Normal windowed mode (1024x768)
+./build/elad-spectrum
+
+# Fullscreen mode
+./build/elad-spectrum -f
+
+# Raspberry Pi 5" LCD (800x480)
+./build/elad-spectrum -p
+
+# Pi fullscreen (recommended for embedded use)
+./build/elad-spectrum -p -f
+
+# Help
+./build/elad-spectrum -h
+```
+
+## Command-line Options
+
+| Option | Description |
+|--------|-------------|
+| `-f, --fullscreen` | Start in fullscreen mode |
+| `-p, --pi` | Set window size to 800x480 (5" LCD) |
+| `-h, --help` | Show help message |
+
+## Hardware Requirements
+
+- Elad FDM-DUO transceiver
+- USB connection to the radio
+- Serial port access (`/dev/ttyUSB0`) for CAT control
+
+## Notes
+
+- USB interfaces may require root access or udev rules for user access
+- Serial port requires `dialout` group membership or root access
+- The FDM-DUO FPGA must be initialized before data streaming begins
+
+## License
+
+This project is provided as-is for amateur radio experimentation.
