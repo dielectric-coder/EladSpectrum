@@ -8,7 +8,7 @@ This project provides a standalone server application for the Elad FDM-DUO Softw
 
 1. **Sound Card** - Audio I/O for transmit/receive audio
 2. **Serial Port** - CAT (Computer Aided Transceiver) control commands
-3. **RF Data Port** - Raw sampled RF data from the antenna (typically 192 KHz bandwidth)
+3. **Sampling Data Port** - Raw sampled RF data from the antenna (typically 192 KHz bandwidth)
 
 ## Technology Stack
 
@@ -66,7 +66,7 @@ EladServer/
 
 - **Vendor ID**: 0x1721
 - **Product ID**: 0x061a
-- **RF Data Endpoint**: 0x86 (bulk transfer)
+- **Sampling Data Endpoint**: 0x86 (bulk transfer)
 - **Sample Format**: 32-bit signed integer IQ pairs (8 bytes per sample)
 - **Buffer Size**: 12288 bytes per transfer (1536 IQ samples)
 - **Sample Rates**: 192, 384, 768, 1536, 3072, 6144 kS/s
