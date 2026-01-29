@@ -1,10 +1,10 @@
-# Elad Server
+# Elad Spectrum
 
-Elad FDM-DUO Transceiver SDR Server application.
+Elad FDM-DUO Transceiver SDR Spectrum Analyzer application.
 
 ## Project Overview
 
-This project provides a standalone server application for the Elad FDM-DUO Software Defined Radio transceiver. The FDM-DUO exposes three USB interfaces:
+This project provides a spectrum analyzer application for the Elad FDM-DUO Software Defined Radio transceiver. The FDM-DUO exposes three USB interfaces:
 
 1. **Sound Card** - Audio I/O for transmit/receive audio
 2. **Serial Port** - CAT (Computer Aided Transceiver) control commands
@@ -44,7 +44,7 @@ This project provides a standalone server application for the Elad FDM-DUO Softw
 ## Project Structure
 
 ```
-EladServer/
+EladSpectrum/
 ├── meson.build              # Build configuration
 ├── CLAUDE.md                # Project documentation
 ├── src/
