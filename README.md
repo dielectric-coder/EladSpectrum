@@ -10,9 +10,9 @@ The FDM-DUO exposes three USB interfaces:
 
 1. **Sound Card** - Audio I/O for transmit/receive audio
 2. **Serial Port** - CAT (Computer Aided Transceiver) control commands
-3. **RF Data Port** - Raw sampled RF data from the antenna (typically 192 KHz bandwidth)
+3. **Sampling Data Port** - Raw sampled RF data from the antenna (typically 192 KHz bandwidth)
 
-This application provides a spectrum analyzer and waterfall display using the RF data port, with CAT control for frequency and mode synchronization.
+This application provides a spectrum analyzer and waterfall display using the sampling data port, with CAT control for frequency and mode synchronization.
 
 ## Features
 
