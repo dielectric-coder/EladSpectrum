@@ -1,0 +1,8 @@
+elad-spectrum (1.0.0-1) bookworm; urgency=medium
+
+  * Initial release.
+  * Spectrum display with 4096-point FFT
+  * Waterfall display
+  * CAT control for frequency and mode
+
+ -- Mikel <mikel@example.com>  Wed, 29 Jan 2026 12:00:00 +0000

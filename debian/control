@@ -1,0 +1,25 @@
+Source: elad-spectrum
+Section: hamradio
+Priority: optional
+Maintainer: Mikel <mikel@example.com>
+Build-Depends: debhelper-compat (= 13),
+               meson,
+               ninja-build,
+               libgtk-4-dev,
+               libusb-1.0-0-dev,
+               libfftw3-dev
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: elad-spectrum
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Elad FDM-DUO SDR spectrum analyzer
+ A GTK4-based spectrum analyzer and waterfall display for the
+ Elad FDM-DUO Software Defined Radio transceiver.
+ .
+ Features:
+  - Live spectrum display with FFT processing
+  - Waterfall display
+  - CAT control for frequency and mode display
+  - Support for 192 kHz to 6144 kHz sample rates
