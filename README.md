@@ -50,6 +50,27 @@ meson setup build
 meson compile -C build
 ```
 
+## Build .deb Package
+
+To build a Debian package for installation:
+
+```bash
+# Install build dependencies
+sudo apt install debhelper devscripts
+
+# Build the package
+dpkg-buildpackage -us -uc -b
+
+# The .deb file will be created in the parent directory
+ls ../*.deb
+```
+
+Install the package:
+
+```bash
+sudo dpkg -i ../elad-spectrum_*.deb
+```
+
 ## Run
 
 ```bash
