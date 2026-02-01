@@ -177,6 +177,17 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         cairo_line_to(cr, plot_x + plot_width, plot_y + plot_height);
         cairo_close_path(cr);
         cairo_fill(cr);
+
+        // Draw red center frequency marker line
+        int center_bin = self->spectrum_size / 2;
+        if (center_bin >= start_bin && center_bin < end_bin) {
+            double marker_x = plot_x + (double)(center_bin - start_bin) / (visible_bins - 1) * plot_width;
+            cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);
+            cairo_set_line_width(cr, 2.0);
+            cairo_move_to(cr, marker_x, plot_y);
+            cairo_line_to(cr, marker_x, plot_y + plot_height);
+            cairo_stroke(cr);
+        }
     }
 
     // Draw overlay (frequency and mode) with transparent background - centered in plot area
