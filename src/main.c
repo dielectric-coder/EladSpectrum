@@ -357,8 +357,8 @@ static void on_encoder2_rotation(int direction, void *user_data) {
         int pan_step = visible_bins / 16;  // Pan 1/16 of visible area per detent
         if (pan_step < 1) pan_step = 1;
 
-        // Update pan offset
-        app_data->pan_offset += direction * pan_step;
+        // Update pan offset (negative direction for intuitive left/right)
+        app_data->pan_offset -= direction * pan_step;
 
         // Clamp to valid range
         int max_pan = (FFT_SIZE - visible_bins) / 2;
