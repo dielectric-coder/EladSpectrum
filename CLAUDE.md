@@ -32,12 +32,13 @@ This project provides a spectrum analyzer application for the Elad FDM-DUO Softw
 - Red tuned frequency marker line (follows zoom/pan, shows arrow when off-screen)
 
 ### Phase 2: CAT Control (Complete)
-- Frequency and mode display overlay on spectrum (transparent background)
+- Frequency, mode and filter bandwidth display overlay on spectrum (transparent background)
 - VFO A/B indicator in spectrum frame label
 - CAT polling via serial port (/dev/ttyUSB0 @ 38400 baud)
 - Kenwood TS-480 compatible IF; command for frequency, mode and VFO
+- RF command for filter bandwidth with mode-specific lookup tables
 - Supported modes: AM, LSB, USB, CW, FM, CW-R
-- Real-time sync with radio tuning, mode and VFO changes
+- Real-time sync with radio tuning, mode, VFO and filter changes
 
 ### Phase 3: Audio Interface (Planned)
 - Interface with the USB sound card
@@ -186,7 +187,7 @@ meson compile -C build
 - **Spectrum Frame**: Shows current VFO (VFO A or VFO B)
 - **Ref**: Spectrum reference level (top of spectrum display in dB)
 - **Range**: Spectrum dynamic range (dB span from ref to bottom)
-- **Overlay**: Frequency and mode displayed centered on spectrum (cyan text)
+- **Overlay**: Frequency, mode and filter bandwidth displayed centered on spectrum (cyan text)
 - **Frequency Marker**: Red vertical line at tuned frequency position (from CAT)
   - Follows zoom and pan movements
   - Shows red arrow at edge when tuned frequency is panned off-screen

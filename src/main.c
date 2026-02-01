@@ -70,6 +70,7 @@ typedef struct {
     int center_freq_hz;
     elad_mode_t current_mode;
     int current_vfo;  // 0=VFO A, 1=VFO B
+    char current_filter[16];  // Filter bandwidth string
     int freq_poll_counter;
 
     // Command-line options
@@ -194,12 +195,28 @@ static gboolean refresh_display(gpointer user_data) {
                                     vfo == 0 ? "VFO A" : "VFO B");
             }
 
-            // Update overlay with frequency and mode
-            if (freq_changed || mode_changed) {
+            // Read filter bandwidth (may have changed even if mode didn't)
+            char filter_str[16] = "";
+            gboolean filter_changed = FALSE;
+            if (cat_control_get_filter_bw(app_data->cat, app_data->current_mode,
+                                          filter_str, sizeof(filter_str)) == 0) {
+                if (strcmp(filter_str, app_data->current_filter) != 0) {
+                    strncpy(app_data->current_filter, filter_str, sizeof(app_data->current_filter) - 1);
+                    app_data->current_filter[sizeof(app_data->current_filter) - 1] = '\0';
+                    filter_changed = TRUE;
+                }
+            }
+
+            // Update overlay with frequency, mode and filter
+            if (freq_changed || mode_changed || filter_changed) {
                 char freq_str[32];
+                char mode_filter_str[32];
                 snprintf(freq_str, sizeof(freq_str), "%.6f MHz", app_data->center_freq_hz / 1e6);
+                snprintf(mode_filter_str, sizeof(mode_filter_str), "%s %s",
+                         usb_device_mode_name(app_data->current_mode),
+                         app_data->current_filter);
                 spectrum_widget_set_overlay(SPECTRUM_WIDGET(app_data->spectrum),
-                                            freq_str, usb_device_mode_name(app_data->current_mode));
+                                            freq_str, mode_filter_str);
             }
         }
     }
