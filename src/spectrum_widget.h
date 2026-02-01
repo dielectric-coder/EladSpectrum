@@ -33,6 +33,12 @@ void spectrum_widget_set_zoom(SpectrumWidget *widget, int zoom_level);
 // Get current zoom level
 int spectrum_widget_get_zoom(SpectrumWidget *widget);
 
+// Set horizontal pan offset (bin offset from center, only effective when zoom > 1)
+void spectrum_widget_set_pan(SpectrumWidget *widget, int pan_offset);
+
+// Get current pan offset
+int spectrum_widget_get_pan(SpectrumWidget *widget);
+
 G_END_DECLS
 
 #endif // SPECTRUM_WIDGET_H

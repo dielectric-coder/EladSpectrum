@@ -12,6 +12,11 @@ struct rotary_encoder {
     struct gpiod_line *dt_line;
     struct gpiod_line *sw_line;
 
+    // GPIO pin numbers (stored for debug output)
+    int clk_pin;
+    int dt_pin;
+    int sw_pin;
+
     int last_clk_state;
     gint64 last_button_time;  // For debouncing
     encoder_param_t active_param;
@@ -25,11 +30,16 @@ struct rotary_encoder {
     guint poll_source_id;
 };
 
-rotary_encoder_t *rotary_encoder_new(void) {
+rotary_encoder_t *rotary_encoder_new_with_pins(int clk_pin, int dt_pin, int sw_pin) {
     rotary_encoder_t *encoder = calloc(1, sizeof(rotary_encoder_t));
     if (!encoder) {
         return NULL;
     }
+
+    // Store pin numbers
+    encoder->clk_pin = clk_pin;
+    encoder->dt_pin = dt_pin;
+    encoder->sw_pin = sw_pin;
 
     // Open GPIO chip
     encoder->chip = gpiod_chip_open(GPIOD_CHIP_PATH);
@@ -40,12 +50,12 @@ rotary_encoder_t *rotary_encoder_new(void) {
     }
 
     // Get GPIO lines
-    encoder->clk_line = gpiod_chip_get_line(encoder->chip, ENCODER_CLK_PIN);
-    encoder->dt_line = gpiod_chip_get_line(encoder->chip, ENCODER_DT_PIN);
-    encoder->sw_line = gpiod_chip_get_line(encoder->chip, ENCODER_SW_PIN);
+    encoder->clk_line = gpiod_chip_get_line(encoder->chip, clk_pin);
+    encoder->dt_line = gpiod_chip_get_line(encoder->chip, dt_pin);
+    encoder->sw_line = gpiod_chip_get_line(encoder->chip, sw_pin);
 
     if (!encoder->clk_line || !encoder->dt_line || !encoder->sw_line) {
-        fprintf(stderr, "Encoder: Failed to get GPIO lines\n");
+        fprintf(stderr, "Encoder: Failed to get GPIO lines %d/%d/%d\n", clk_pin, dt_pin, sw_pin);
         gpiod_chip_close(encoder->chip);
         free(encoder);
         return NULL;
@@ -61,7 +71,7 @@ rotary_encoder_t *rotary_encoder_new(void) {
     if (gpiod_line_request(encoder->clk_line, &config, 0) < 0 ||
         gpiod_line_request(encoder->dt_line, &config, 0) < 0 ||
         gpiod_line_request(encoder->sw_line, &config, 0) < 0) {
-        fprintf(stderr, "Encoder: Failed to request GPIO lines\n");
+        fprintf(stderr, "Encoder: Failed to request GPIO lines %d/%d/%d\n", clk_pin, dt_pin, sw_pin);
         gpiod_chip_close(encoder->chip);
         free(encoder);
         return NULL;
@@ -70,13 +80,16 @@ rotary_encoder_t *rotary_encoder_new(void) {
     // Initialize state
     encoder->last_clk_state = gpiod_line_get_value(encoder->clk_line);
     encoder->last_button_time = 0;
-    encoder->active_param = ENCODER_PARAM_REF;
+    encoder->active_param = ENCODER_PARAM_SPECTRUM_REF;
     encoder->poll_source_id = 0;
 
-    fprintf(stderr, "Encoder: Initialized on GPIO %d/%d/%d\n",
-            ENCODER_CLK_PIN, ENCODER_DT_PIN, ENCODER_SW_PIN);
+    fprintf(stderr, "Encoder: Initialized on GPIO %d/%d/%d\n", clk_pin, dt_pin, sw_pin);
 
     return encoder;
+}
+
+rotary_encoder_t *rotary_encoder_new(void) {
+    return rotary_encoder_new_with_pins(ENCODER1_CLK_PIN, ENCODER1_DT_PIN, ENCODER1_SW_PIN);
 }
 
 void rotary_encoder_free(rotary_encoder_t *encoder) {
@@ -109,7 +122,7 @@ void rotary_encoder_set_button_callback(rotary_encoder_t *encoder,
 }
 
 encoder_param_t rotary_encoder_get_active_param(rotary_encoder_t *encoder) {
-    if (!encoder) return ENCODER_PARAM_REF;
+    if (!encoder) return ENCODER_PARAM_SPECTRUM_REF;
     return encoder->active_param;
 }
 
@@ -120,8 +133,7 @@ void rotary_encoder_set_active_param(rotary_encoder_t *encoder, encoder_param_t 
 
 void rotary_encoder_toggle_param(rotary_encoder_t *encoder) {
     if (!encoder) return;
-    encoder->active_param = (encoder->active_param == ENCODER_PARAM_REF)
-                            ? ENCODER_PARAM_RANGE : ENCODER_PARAM_REF;
+    encoder->active_param = (encoder->active_param + 1) % ENCODER_PARAM_COUNT;
 }
 
 // Poll callback - called from GLib main loop

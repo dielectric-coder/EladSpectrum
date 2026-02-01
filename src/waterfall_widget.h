@@ -27,6 +27,12 @@ void waterfall_widget_set_zoom(WaterfallWidget *widget, int zoom_level);
 // Get current zoom level
 int waterfall_widget_get_zoom(WaterfallWidget *widget);
 
+// Set horizontal pan offset (bin offset from center, only effective when zoom > 1)
+void waterfall_widget_set_pan(WaterfallWidget *widget, int pan_offset);
+
+// Get current pan offset
+int waterfall_widget_get_pan(WaterfallWidget *widget);
+
 G_END_DECLS
 
 #endif // WATERFALL_WIDGET_H

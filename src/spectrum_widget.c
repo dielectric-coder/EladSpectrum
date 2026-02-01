@@ -17,6 +17,7 @@ struct _SpectrumWidget {
     int center_freq_hz;
     int sample_rate;
     int zoom_level;  // 1, 2, 4, 8 = horizontal zoom factor
+    int pan_offset;  // Bin offset from center (only effective when zoom > 1)
 
     // Overlay text
     char overlay_freq[32];
@@ -88,10 +89,13 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         cairo_show_text(cr, label);
     }
 
-    // Draw frequency labels in bottom margin (adjusted for zoom)
+    // Draw frequency labels in bottom margin (adjusted for zoom and pan)
     if (self->sample_rate > 0) {
         double freq_span = self->sample_rate / self->zoom_level;
-        double freq_start = self->center_freq_hz - freq_span / 2;
+        // Calculate pan offset in Hz
+        double hz_per_bin = (double)self->sample_rate / self->spectrum_size;
+        double pan_hz = self->pan_offset * hz_per_bin;
+        double freq_start = self->center_freq_hz - freq_span / 2 + pan_hz;
 
         for (int i = 0; i <= num_v_lines; i++) {
             double x = plot_x + (double)i / num_v_lines * plot_width;
@@ -114,11 +118,15 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         }
     }
 
-    // Draw spectrum in plot area (with zoom support)
+    // Draw spectrum in plot area (with zoom and pan support)
     if (self->spectrum_db && self->spectrum_size > 0) {
-        // Calculate visible bin range based on zoom level
+        // Calculate visible bin range based on zoom level and pan offset
         int visible_bins = self->spectrum_size / self->zoom_level;
-        int start_bin = (self->spectrum_size - visible_bins) / 2;
+        int max_pan = (self->spectrum_size - visible_bins) / 2;
+        int clamped_pan = self->pan_offset;
+        if (clamped_pan < -max_pan) clamped_pan = -max_pan;
+        if (clamped_pan > max_pan) clamped_pan = max_pan;
+        int start_bin = (self->spectrum_size - visible_bins) / 2 + clamped_pan;
         int end_bin = start_bin + visible_bins;
 
         // Draw spectrum line (cyan)
@@ -232,6 +240,7 @@ static void spectrum_widget_init(SpectrumWidget *self) {
     self->center_freq_hz = 14200000;
     self->sample_rate = DEFAULT_SAMPLE_RATE;
     self->zoom_level = 1;
+    self->pan_offset = 0;
     self->overlay_freq[0] = '\0';
     self->overlay_mode[0] = '\0';
 
@@ -315,4 +324,15 @@ void spectrum_widget_set_zoom(SpectrumWidget *widget, int zoom_level) {
 int spectrum_widget_get_zoom(SpectrumWidget *widget) {
     if (!widget) return 1;
     return widget->zoom_level;
+}
+
+void spectrum_widget_set_pan(SpectrumWidget *widget, int pan_offset) {
+    if (!widget) return;
+    widget->pan_offset = pan_offset;
+    gtk_widget_queue_draw(GTK_WIDGET(widget));
+}
+
+int spectrum_widget_get_pan(SpectrumWidget *widget) {
+    if (!widget) return 0;
+    return widget->pan_offset;
 }

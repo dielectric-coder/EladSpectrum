@@ -16,6 +16,15 @@
 #include "rotary_encoder.h"
 #endif
 
+// Active parameter for encoder 1
+typedef enum {
+    PARAM_SPECTRUM_REF = 0,
+    PARAM_SPECTRUM_RANGE = 1,
+    PARAM_WATERFALL_REF = 2,
+    PARAM_WATERFALL_RANGE = 3,
+    PARAM_COUNT = 4
+} active_param_t;
+
 // Application state
 typedef struct {
     GtkApplication *app;
@@ -24,16 +33,22 @@ typedef struct {
     GtkWidget *spectrum_frame;
     GtkWidget *waterfall;
     GtkWidget *status_label;
-    GtkAdjustment *ref_adj;
-    GtkAdjustment *range_adj;
+    GtkAdjustment *ref_adj;           // Spectrum reference level
+    GtkAdjustment *range_adj;         // Spectrum dynamic range
+    GtkAdjustment *waterfall_ref_adj;   // Waterfall reference level
+    GtkAdjustment *waterfall_range_adj; // Waterfall dynamic range
 
     usb_device_t *usb;
     fft_processor_t *fft;
     cat_control_t *cat;
 #ifdef HAVE_GPIOD
-    rotary_encoder_t *encoder;
-    GtkWidget *zoom_label;
-    int zoom_level;  // 1, 2, 4
+    rotary_encoder_t *encoder1;       // Parameter control encoder
+    rotary_encoder_t *encoder2;       // Zoom/pan control encoder
+    GtkWidget *param_label;           // Shows active parameter
+    GtkWidget *zoom_label;            // Shows zoom level
+    active_param_t active_param;      // Current parameter selection
+    int zoom_level;                   // 1, 2, 4
+    int pan_offset;                   // Shared pan for spectrum/waterfall
 #endif
 
     pthread_t usb_thread;
@@ -198,18 +213,43 @@ static gboolean refresh_display(gpointer user_data) {
     return G_SOURCE_CONTINUE;
 }
 
-// Range changed callback
-static void on_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_data) {
+// Spectrum range changed callback
+static void on_spectrum_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
     float ref_db = (float)gtk_adjustment_get_value(app_data->ref_adj);
     float range_db = (float)gtk_adjustment_get_value(app_data->range_adj);
     float min_db = ref_db - range_db;
 
     spectrum_widget_set_range(SPECTRUM_WIDGET(app_data->spectrum), min_db, ref_db);
+}
+
+// Waterfall range changed callback
+static void on_waterfall_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+    float ref_db = (float)gtk_adjustment_get_value(app_data->waterfall_ref_adj);
+    float range_db = (float)gtk_adjustment_get_value(app_data->waterfall_range_adj);
+    float min_db = ref_db - range_db;
+
     waterfall_widget_set_range(WATERFALL_WIDGET(app_data->waterfall), min_db, ref_db);
 }
 
 #ifdef HAVE_GPIOD
+// Parameter names for display
+static const char *param_names[] = {
+    "Spectrum Ref",
+    "Spectrum Range",
+    "Waterfall Ref",
+    "Waterfall Range"
+};
+
+// Update parameter label display
+static void update_param_label(app_data_t *app_data) {
+    char label[64];
+    snprintf(label, sizeof(label), "<span foreground='cyan' weight='bold'>%s</span>",
+             param_names[app_data->active_param]);
+    gtk_label_set_markup(GTK_LABEL(app_data->param_label), label);
+}
+
 // Update zoom label display
 static void update_zoom_label(app_data_t *app_data) {
     char label[32];
@@ -218,24 +258,85 @@ static void update_zoom_label(app_data_t *app_data) {
     gtk_label_set_markup(GTK_LABEL(app_data->zoom_label), label);
 }
 
-// Encoder rotation callback - adjusts Ref level
-static void on_encoder_rotation(int direction, void *user_data) {
+// Encoder 1 rotation callback - adjusts active parameter
+static void on_encoder1_rotation(int direction, void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
 
-    double value = gtk_adjustment_get_value(app_data->ref_adj);
-    double new_value = value + (direction * 1.0);  // 1 dB per detent
+    GtkAdjustment *adj = NULL;
+    double step = 1.0;  // Default 1 dB per detent for ref levels
+
+    switch (app_data->active_param) {
+        case PARAM_SPECTRUM_REF:
+            adj = app_data->ref_adj;
+            step = 1.0;
+            break;
+        case PARAM_SPECTRUM_RANGE:
+            adj = app_data->range_adj;
+            step = 5.0;  // 5 dB per detent for range
+            break;
+        case PARAM_WATERFALL_REF:
+            adj = app_data->waterfall_ref_adj;
+            step = 1.0;
+            break;
+        case PARAM_WATERFALL_RANGE:
+            adj = app_data->waterfall_range_adj;
+            step = 5.0;  // 5 dB per detent for range
+            break;
+        default:
+            return;
+    }
+
+    double value = gtk_adjustment_get_value(adj);
+    double new_value = value + (direction * step);
 
     // Clamp to adjustment bounds
-    double lower = gtk_adjustment_get_lower(app_data->ref_adj);
-    double upper = gtk_adjustment_get_upper(app_data->ref_adj);
+    double lower = gtk_adjustment_get_lower(adj);
+    double upper = gtk_adjustment_get_upper(adj);
     if (new_value < lower) new_value = lower;
     if (new_value > upper) new_value = upper;
 
-    gtk_adjustment_set_value(app_data->ref_adj, new_value);
+    gtk_adjustment_set_value(adj, new_value);
 }
 
-// Encoder button callback - cycles zoom level
-static void on_encoder_button(void *user_data) {
+// Encoder 1 button callback - cycles through parameters
+static void on_encoder1_button(void *user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+
+    // Cycle through 4 parameters
+    app_data->active_param = (app_data->active_param + 1) % PARAM_COUNT;
+
+    update_param_label(app_data);
+}
+
+// Encoder 2 rotation callback - pans horizontally (only when zoom > 1)
+static void on_encoder2_rotation(int direction, void *user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+
+    // Pan only works when zoomed in
+    if (app_data->zoom_level == 1) {
+        return;
+    }
+
+    // Calculate pan step (number of bins per detent)
+    int visible_bins = FFT_SIZE / app_data->zoom_level;
+    int pan_step = visible_bins / 16;  // Pan 1/16 of visible area per detent
+    if (pan_step < 1) pan_step = 1;
+
+    // Update pan offset
+    app_data->pan_offset += direction * pan_step;
+
+    // Clamp to valid range
+    int max_pan = (FFT_SIZE - visible_bins) / 2;
+    if (app_data->pan_offset < -max_pan) app_data->pan_offset = -max_pan;
+    if (app_data->pan_offset > max_pan) app_data->pan_offset = max_pan;
+
+    // Apply pan to both widgets
+    spectrum_widget_set_pan(SPECTRUM_WIDGET(app_data->spectrum), app_data->pan_offset);
+    waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), app_data->pan_offset);
+}
+
+// Encoder 2 button callback - cycles zoom level
+static void on_encoder2_button(void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
 
     // Cycle zoom: 1 -> 2 -> 4 -> 1
@@ -247,9 +348,14 @@ static void on_encoder_button(void *user_data) {
         app_data->zoom_level = 1;
     }
 
-    // Apply zoom to both widgets
+    // Reset pan when zoom changes
+    app_data->pan_offset = 0;
+
+    // Apply zoom and reset pan to both widgets
     spectrum_widget_set_zoom(SPECTRUM_WIDGET(app_data->spectrum), app_data->zoom_level);
+    spectrum_widget_set_pan(SPECTRUM_WIDGET(app_data->spectrum), 0);
     waterfall_widget_set_zoom(WATERFALL_WIDGET(app_data->waterfall), app_data->zoom_level);
+    waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), 0);
 
     update_zoom_label(app_data);
 }
@@ -292,31 +398,41 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_widget_set_halign(hbox, GTK_ALIGN_CENTER);
     gtk_box_append(GTK_BOX(vbox), hbox);
 
-    // Reference level (max dB) control
+    // Spectrum Reference level (max dB) control
     GtkWidget *ref_label = gtk_label_new("Ref:");
     gtk_box_append(GTK_BOX(hbox), ref_label);
 
     app_data->ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
     GtkWidget *ref_spin = gtk_spin_button_new(app_data->ref_adj, 1.0, 0);
-    g_signal_connect(app_data->ref_adj, "value-changed", G_CALLBACK(on_range_changed), app_data);
+    g_signal_connect(app_data->ref_adj, "value-changed", G_CALLBACK(on_spectrum_range_changed), app_data);
     gtk_box_append(GTK_BOX(hbox), ref_spin);
 
-    // Range (dB span) control
+    // Spectrum Range (dB span) control
     GtkWidget *range_label = gtk_label_new("Range:");
     gtk_box_append(GTK_BOX(hbox), range_label);
 
     app_data->range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
     GtkWidget *range_spin = gtk_spin_button_new(app_data->range_adj, 1.0, 0);
-    g_signal_connect(app_data->range_adj, "value-changed", G_CALLBACK(on_range_changed), app_data);
+    g_signal_connect(app_data->range_adj, "value-changed", G_CALLBACK(on_spectrum_range_changed), app_data);
     gtk_box_append(GTK_BOX(hbox), range_spin);
+
+    // Waterfall adjustments (use same initial values as spectrum, but independent)
+    app_data->waterfall_ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
+    g_signal_connect(app_data->waterfall_ref_adj, "value-changed", G_CALLBACK(on_waterfall_range_changed), app_data);
+
+    app_data->waterfall_range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
+    g_signal_connect(app_data->waterfall_range_adj, "value-changed", G_CALLBACK(on_waterfall_range_changed), app_data);
 
     // Status label
     app_data->status_label = gtk_label_new("Initializing...");
     gtk_box_append(GTK_BOX(hbox), app_data->status_label);
 
 #ifdef HAVE_GPIOD
-    // Zoom label (only shown in Pi mode with encoder)
+    // Parameter and zoom labels (only shown in Pi mode with encoder)
     if (app_data->pi_mode) {
+        app_data->param_label = gtk_label_new(NULL);
+        gtk_box_append(GTK_BOX(hbox), app_data->param_label);
+
         app_data->zoom_label = gtk_label_new(NULL);
         gtk_box_append(GTK_BOX(hbox), app_data->zoom_label);
     }
@@ -354,7 +470,10 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     app_data->waterfall = waterfall_widget_new();
     int waterfall_min_h = (app_data->window_height <= 480) ? 150 : 300;
     gtk_widget_set_size_request(app_data->waterfall, -1, waterfall_min_h);
-    waterfall_widget_set_range(WATERFALL_WIDGET(app_data->waterfall), ref_db - range_db, ref_db);
+    // Use waterfall-specific adjustments for initial range
+    float wf_ref_db = (float)gtk_adjustment_get_value(app_data->waterfall_ref_adj);
+    float wf_range_db = (float)gtk_adjustment_get_value(app_data->waterfall_range_adj);
+    waterfall_widget_set_range(WATERFALL_WIDGET(app_data->waterfall), wf_ref_db - wf_range_db, wf_ref_db);
 
     GtkWidget *waterfall_frame = gtk_frame_new("Waterfall");
     gtk_frame_set_child(GTK_FRAME(waterfall_frame), app_data->waterfall);
@@ -390,23 +509,43 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     }
 
 #ifdef HAVE_GPIOD
-    // Initialize rotary encoder (Pi mode only)
+    // Initialize rotary encoders (Pi mode only)
     if (app_data->pi_mode) {
         app_data->zoom_level = 1;
-        app_data->encoder = rotary_encoder_new();
-        if (app_data->encoder) {
-            rotary_encoder_set_rotation_callback(app_data->encoder,
-                                                 on_encoder_rotation, app_data);
-            rotary_encoder_set_button_callback(app_data->encoder,
-                                               on_encoder_button, app_data);
-            rotary_encoder_start_polling(app_data->encoder);
-            update_zoom_label(app_data);
-            fprintf(stderr, "Rotary encoder initialized\n");
+        app_data->pan_offset = 0;
+        app_data->active_param = PARAM_SPECTRUM_REF;
+
+        // Encoder 1 - Parameter control (GPIO 17/27/22)
+        app_data->encoder1 = rotary_encoder_new_with_pins(
+            ENCODER1_CLK_PIN, ENCODER1_DT_PIN, ENCODER1_SW_PIN);
+        if (app_data->encoder1) {
+            rotary_encoder_set_rotation_callback(app_data->encoder1,
+                                                 on_encoder1_rotation, app_data);
+            rotary_encoder_set_button_callback(app_data->encoder1,
+                                               on_encoder1_button, app_data);
+            rotary_encoder_start_polling(app_data->encoder1);
+            fprintf(stderr, "Encoder 1 (parameter) initialized\n");
         } else {
-            fprintf(stderr, "Rotary encoder not available\n");
-            // Still show zoom label even without encoder
-            update_zoom_label(app_data);
+            fprintf(stderr, "Encoder 1 not available\n");
         }
+
+        // Encoder 2 - Zoom/Pan control (GPIO 5/6/13)
+        app_data->encoder2 = rotary_encoder_new_with_pins(
+            ENCODER2_CLK_PIN, ENCODER2_DT_PIN, ENCODER2_SW_PIN);
+        if (app_data->encoder2) {
+            rotary_encoder_set_rotation_callback(app_data->encoder2,
+                                                 on_encoder2_rotation, app_data);
+            rotary_encoder_set_button_callback(app_data->encoder2,
+                                               on_encoder2_button, app_data);
+            rotary_encoder_start_polling(app_data->encoder2);
+            fprintf(stderr, "Encoder 2 (zoom/pan) initialized\n");
+        } else {
+            fprintf(stderr, "Encoder 2 not available\n");
+        }
+
+        // Update labels
+        update_param_label(app_data);
+        update_zoom_label(app_data);
     }
 #endif
 
@@ -436,7 +575,8 @@ static void shutdown_app(GtkApplication *gtk_app G_GNUC_UNUSED, gpointer user_da
 
     // Cleanup
 #ifdef HAVE_GPIOD
-    rotary_encoder_free(app_data->encoder);
+    rotary_encoder_free(app_data->encoder1);
+    rotary_encoder_free(app_data->encoder2);
 #endif
     fft_processor_free(app_data->fft);
     usb_device_free(app_data->usb);

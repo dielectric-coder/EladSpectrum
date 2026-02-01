@@ -81,22 +81,40 @@ EladSpectrum/
 - **Averaging**: 3 frames
 - **Update Rate**: ~15.6 lines/second (192000 / 4096 / 3)
 
-## Rotary Encoder (Raspberry Pi)
+## Dual Rotary Encoders (Raspberry Pi)
 
-Optional GPIO rotary encoder support for hands-free parameter adjustment in Pi mode.
+Optional dual GPIO rotary encoder support for hands-free parameter adjustment in Pi mode.
 
 ### Hardware Setup
 
-| Pin | GPIO (BCM) | Function |
-|-----|------------|----------|
-| CLK | 17 | Rotation clock (A) |
-| DT  | 27 | Rotation data (B) |
-| SW  | 22 | Push button |
+| Encoder | Pin | GPIO (BCM) | Function |
+|---------|-----|------------|----------|
+| 1 | CLK | 17 | Rotation clock (A) |
+| 1 | DT  | 27 | Rotation data (B) |
+| 1 | SW  | 22 | Push button |
+| 2 | CLK | 5  | Rotation clock (A) |
+| 2 | DT  | 6  | Rotation data (B) |
+| 2 | SW  | 13 | Push button |
 
-### Operation
+### Encoder 1 - Parameter Control
 
-- **Rotation**: Adjusts Reference Level (1 dB per detent)
-- **Button press**: Cycles horizontal zoom (1x → 2x → 4x → 1x)
+Controls display parameters with independent spectrum/waterfall settings.
+
+- **Button press**: Cycles active parameter:
+  - Spectrum Ref → Spectrum Range → Waterfall Ref → Waterfall Range → (repeat)
+- **Rotation**: Adjusts active parameter
+  - Ref levels: ±1 dB per detent
+  - Range: ±5 dB per detent
+- **Visual feedback**: Active parameter name displayed in cyan
+
+### Encoder 2 - Zoom/Pan Control
+
+Controls horizontal zoom and panning.
+
+- **Button press**: Cycles zoom (1x → 2x → 4x → 1x)
+- **Rotation**: Pans spectrum/waterfall horizontally
+  - Only effective when zoom > 1x
+  - Pan resets to center when zoom changes
 - **Visual feedback**: Zoom level displayed in cyan ("Zoom: Nx")
 
 ### Zoom Levels
@@ -112,6 +130,7 @@ Optional GPIO rotary encoder support for hands-free parameter adjustment in Pi m
 - Only enabled when running in Pi mode (`-p` flag)
 - Requires libgpiod library (auto-detected at build time)
 - Builds without encoder support if libgpiod is not available
+- Spectrum and waterfall have independent ref/range settings
 
 ## Dependencies
 
@@ -160,9 +179,10 @@ meson compile -C build
 ## UI Controls
 
 - **Spectrum Frame**: Shows current VFO (VFO A or VFO B)
-- **Ref**: Reference level (top of spectrum display in dB)
-- **Range**: Dynamic range (dB span from ref to bottom)
+- **Ref**: Spectrum reference level (top of spectrum display in dB)
+- **Range**: Spectrum dynamic range (dB span from ref to bottom)
 - **Overlay**: Frequency and mode displayed centered on spectrum (cyan text)
+- **Active Param**: Currently selected parameter for encoder 1 (Pi mode)
 - **Zoom**: Current zoom level shown in cyan (Pi mode with encoder)
 
 ## Notes

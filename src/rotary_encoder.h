@@ -4,14 +4,28 @@
 #include <glib.h>
 
 // Default GPIO pin assignments (BCM numbering)
-#define ENCODER_CLK_PIN  17   // Rotation clock (A)
-#define ENCODER_DT_PIN   27   // Rotation data (B)
-#define ENCODER_SW_PIN   22   // Push button
+// Encoder 1 - Parameter control
+#define ENCODER1_CLK_PIN  17   // Rotation clock (A)
+#define ENCODER1_DT_PIN   27   // Rotation data (B)
+#define ENCODER1_SW_PIN   22   // Push button
 
-// Active parameter selection
+// Encoder 2 - Zoom/Pan control
+#define ENCODER2_CLK_PIN  5    // Rotation clock (A)
+#define ENCODER2_DT_PIN   6    // Rotation data (B)
+#define ENCODER2_SW_PIN   13   // Push button
+
+// Legacy defines for backward compatibility
+#define ENCODER_CLK_PIN  ENCODER1_CLK_PIN
+#define ENCODER_DT_PIN   ENCODER1_DT_PIN
+#define ENCODER_SW_PIN   ENCODER1_SW_PIN
+
+// Active parameter selection (for parameter encoder)
 typedef enum {
-    ENCODER_PARAM_REF = 0,    // Reference level
-    ENCODER_PARAM_RANGE = 1   // Dynamic range
+    ENCODER_PARAM_SPECTRUM_REF = 0,    // Spectrum reference level
+    ENCODER_PARAM_SPECTRUM_RANGE = 1,  // Spectrum dynamic range
+    ENCODER_PARAM_WATERFALL_REF = 2,   // Waterfall reference level
+    ENCODER_PARAM_WATERFALL_RANGE = 3, // Waterfall dynamic range
+    ENCODER_PARAM_COUNT = 4
 } encoder_param_t;
 
 // Callback function type for rotation events
@@ -24,7 +38,11 @@ typedef void (*encoder_button_callback_t)(void *user_data);
 // Opaque encoder handle
 typedef struct rotary_encoder rotary_encoder_t;
 
-// Create and initialize rotary encoder
+// Create and initialize rotary encoder with custom GPIO pins
+// Returns NULL on failure (e.g., GPIO not available)
+rotary_encoder_t *rotary_encoder_new_with_pins(int clk_pin, int dt_pin, int sw_pin);
+
+// Create and initialize rotary encoder with default pins (encoder 1)
 // Returns NULL on failure (e.g., GPIO not available)
 rotary_encoder_t *rotary_encoder_new(void);
 

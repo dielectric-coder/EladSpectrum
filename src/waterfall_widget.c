@@ -24,6 +24,7 @@ struct _WaterfallWidget {
     float min_db;
     float max_db;
     int zoom_level;  // 1, 2, 4, 8 = horizontal zoom factor
+    int pan_offset;  // Bin offset from center (only effective when zoom > 1)
 };
 
 G_DEFINE_TYPE(WaterfallWidget, waterfall_widget, GTK_TYPE_DRAWING_AREA)
@@ -166,6 +167,7 @@ static void waterfall_widget_init(WaterfallWidget *self) {
     self->min_db = -120.0f;
     self->max_db = 0.0f;
     self->zoom_level = 1;
+    self->pan_offset = 0;
 
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(self), waterfall_widget_draw, NULL, NULL);
 }
@@ -203,9 +205,13 @@ void waterfall_widget_add_line(WaterfallWidget *widget, const float *spectrum_db
         float range = widget->max_db - widget->min_db;
         if (range < 1.0f) range = 1.0f;
 
-        // Calculate visible bin range based on zoom level
+        // Calculate visible bin range based on zoom level and pan offset
         int visible_bins = size / widget->zoom_level;
-        int start_bin = (size - visible_bins) / 2;
+        int max_pan = (size - visible_bins) / 2;
+        int clamped_pan = widget->pan_offset;
+        if (clamped_pan < -max_pan) clamped_pan = -max_pan;
+        if (clamped_pan > max_pan) clamped_pan = max_pan;
+        int start_bin = (size - visible_bins) / 2 + clamped_pan;
 
         uint32_t *row = (uint32_t *)data;
         for (int x = 0; x < width; x++) {
@@ -277,4 +283,18 @@ void waterfall_widget_set_zoom(WaterfallWidget *widget, int zoom_level) {
 int waterfall_widget_get_zoom(WaterfallWidget *widget) {
     if (!widget) return 1;
     return widget->zoom_level;
+}
+
+void waterfall_widget_set_pan(WaterfallWidget *widget, int pan_offset) {
+    if (!widget) return;
+    if (widget->pan_offset != pan_offset) {
+        widget->pan_offset = pan_offset;
+        // Clear waterfall when pan changes for clean display
+        waterfall_widget_clear(widget);
+    }
+}
+
+int waterfall_widget_get_pan(WaterfallWidget *widget) {
+    if (!widget) return 0;
+    return widget->pan_offset;
 }
