@@ -8,6 +8,7 @@ libusb_dep = dependency('libusb-1.0')
 fftw3_dep = dependency('fftw3')
 threads_dep = dependency('threads')
 math_dep = meson.get_compiler('c').find_library('m', required: true)
+gpiod_dep = dependency('libgpiod', required: false)
 
 src_files = [
   'src/main.c',
@@ -18,8 +19,19 @@ src_files = [
   'src/cat_control.c',
 ]
 
+# Rotary encoder support (optional, requires libgpiod)
+if gpiod_dep.found()
+  src_files += 'src/rotary_encoder.c'
+  add_project_arguments('-DHAVE_GPIOD', language: 'c')
+endif
+
+deps = [gtk4_dep, libusb_dep, fftw3_dep, threads_dep, math_dep]
+if gpiod_dep.found()
+  deps += gpiod_dep
+endif
+
 executable('elad-spectrum',
   src_files,
-  dependencies: [gtk4_dep, libusb_dep, fftw3_dep, threads_dep, math_dep],
+  dependencies: deps,
   install: true
 )

@@ -12,6 +12,9 @@
 #include "spectrum_widget.h"
 #include "waterfall_widget.h"
 #include "cat_control.h"
+#ifdef HAVE_GPIOD
+#include "rotary_encoder.h"
+#endif
 
 // Application state
 typedef struct {
@@ -27,6 +30,11 @@ typedef struct {
     usb_device_t *usb;
     fft_processor_t *fft;
     cat_control_t *cat;
+#ifdef HAVE_GPIOD
+    rotary_encoder_t *encoder;
+    GtkWidget *ref_label;
+    GtkWidget *range_label;
+#endif
 
     pthread_t usb_thread;
     atomic_int running;
@@ -44,6 +52,7 @@ typedef struct {
 
     // Command-line options
     gboolean fullscreen;
+    gboolean pi_mode;
     int window_width;
     int window_height;
 } app_data_t;
@@ -200,6 +209,52 @@ static void on_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_dat
     waterfall_widget_set_range(WATERFALL_WIDGET(app_data->waterfall), min_db, ref_db);
 }
 
+#ifdef HAVE_GPIOD
+// Update label highlighting to show active encoder parameter
+static void update_encoder_highlight(app_data_t *app_data) {
+    encoder_param_t active = rotary_encoder_get_active_param(app_data->encoder);
+
+    // Use Pango markup for highlighting - cyan for active, default for inactive
+    if (active == ENCODER_PARAM_REF) {
+        gtk_label_set_markup(GTK_LABEL(app_data->ref_label),
+                             "<span foreground='cyan' weight='bold'>Ref:</span>");
+        gtk_label_set_text(GTK_LABEL(app_data->range_label), "Range:");
+    } else {
+        gtk_label_set_text(GTK_LABEL(app_data->ref_label), "Ref:");
+        gtk_label_set_markup(GTK_LABEL(app_data->range_label),
+                             "<span foreground='cyan' weight='bold'>Range:</span>");
+    }
+}
+
+// Encoder rotation callback
+static void on_encoder_rotation(int direction, void *user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+    encoder_param_t active = rotary_encoder_get_active_param(app_data->encoder);
+
+    GtkAdjustment *adj = (active == ENCODER_PARAM_REF)
+                         ? app_data->ref_adj : app_data->range_adj;
+
+    // Step sizes: 1 dB for ref, 5 dB for range
+    double step = (active == ENCODER_PARAM_REF) ? 1.0 : 5.0;
+    double value = gtk_adjustment_get_value(adj);
+    double new_value = value + (direction * step);
+
+    // Clamp to adjustment bounds
+    double lower = gtk_adjustment_get_lower(adj);
+    double upper = gtk_adjustment_get_upper(adj);
+    if (new_value < lower) new_value = lower;
+    if (new_value > upper) new_value = upper;
+
+    gtk_adjustment_set_value(adj, new_value);
+}
+
+// Encoder button callback
+static void on_encoder_button(void *user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+    update_encoder_highlight(app_data);
+}
+#endif
+
 // Window close handler
 static gboolean on_window_close(GtkWindow *window G_GNUC_UNUSED, gpointer user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
@@ -238,8 +293,13 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_box_append(GTK_BOX(vbox), hbox);
 
     // Reference level (max dB) control
+#ifdef HAVE_GPIOD
+    app_data->ref_label = gtk_label_new("Ref:");
+    gtk_box_append(GTK_BOX(hbox), app_data->ref_label);
+#else
     GtkWidget *ref_label = gtk_label_new("Ref:");
     gtk_box_append(GTK_BOX(hbox), ref_label);
+#endif
 
     app_data->ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
     GtkWidget *ref_spin = gtk_spin_button_new(app_data->ref_adj, 1.0, 0);
@@ -247,8 +307,13 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_box_append(GTK_BOX(hbox), ref_spin);
 
     // Range (dB span) control
+#ifdef HAVE_GPIOD
+    app_data->range_label = gtk_label_new("Range:");
+    gtk_box_append(GTK_BOX(hbox), app_data->range_label);
+#else
     GtkWidget *range_label = gtk_label_new("Range:");
     gtk_box_append(GTK_BOX(hbox), range_label);
+#endif
 
     app_data->range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
     GtkWidget *range_spin = gtk_spin_button_new(app_data->range_adj, 1.0, 0);
@@ -326,6 +391,24 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
         gtk_label_set_text(GTK_LABEL(app_data->status_label), "FFT init failed");
     }
 
+#ifdef HAVE_GPIOD
+    // Initialize rotary encoder (Pi mode only)
+    if (app_data->pi_mode) {
+        app_data->encoder = rotary_encoder_new();
+        if (app_data->encoder) {
+            rotary_encoder_set_rotation_callback(app_data->encoder,
+                                                 on_encoder_rotation, app_data);
+            rotary_encoder_set_button_callback(app_data->encoder,
+                                               on_encoder_button, app_data);
+            rotary_encoder_start_polling(app_data->encoder);
+            update_encoder_highlight(app_data);
+            fprintf(stderr, "Rotary encoder initialized\n");
+        } else {
+            fprintf(stderr, "Rotary encoder not available\n");
+        }
+    }
+#endif
+
     // Start USB thread
     atomic_store(&app_data->running, 1);
     atomic_store(&app_data->usb_connected, 0);
@@ -351,6 +434,9 @@ static void shutdown_app(GtkApplication *gtk_app G_GNUC_UNUSED, gpointer user_da
     app_data_t *app_data = (app_data_t *)user_data;
 
     // Cleanup
+#ifdef HAVE_GPIOD
+    rotary_encoder_free(app_data->encoder);
+#endif
     fft_processor_free(app_data->fft);
     usb_device_free(app_data->usb);
     cat_control_free(app_data->cat);
@@ -371,6 +457,7 @@ int main(int argc, char *argv[]) {
     g_mutex_init(&app.spectrum_mutex);
     app.center_freq_hz = 15300000;  // 15.3 MHz default
     app.fullscreen = FALSE;
+    app.pi_mode = FALSE;
     app.window_width = 1024;   // Default size
     app.window_height = 768;
 
@@ -384,6 +471,7 @@ int main(int argc, char *argv[]) {
             app.fullscreen = TRUE;
             // Don't pass to GTK
         } else if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--pi") == 0) {
+            app.pi_mode = TRUE;
             app.window_width = 800;
             app.window_height = 480;
             // Don't pass to GTK
