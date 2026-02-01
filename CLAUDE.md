@@ -109,13 +109,14 @@ Controls display parameters with independent spectrum/waterfall settings.
 
 ### Encoder 2 - Zoom/Pan Control
 
-Controls horizontal zoom and panning.
+Controls horizontal zoom and panning with mode toggle.
 
-- **Button press**: Cycles zoom (1x → 2x → 4x → 1x)
-- **Rotation**: Pans spectrum/waterfall horizontally
-  - Only effective when zoom > 1x
+- **Button press**: Toggles between Zoom mode and Pan mode
+- **Rotation in Zoom mode**: Changes zoom level (1x ↔ 2x ↔ 4x)
   - Pan resets to center when zoom changes
-- **Visual feedback**: Zoom level displayed in cyan ("Zoom: Nx")
+- **Rotation in Pan mode**: Translates spectrum/waterfall horizontally
+  - Only effective when zoom > 1x
+- **Visual feedback**: Mode and zoom level displayed in cyan ("Zoom 2x" or "Pan 2x")
 
 ### Zoom Levels
 

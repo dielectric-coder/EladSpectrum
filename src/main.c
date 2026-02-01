@@ -25,6 +25,12 @@ typedef enum {
     PARAM_COUNT = 4
 } active_param_t;
 
+// Encoder 2 mode (zoom vs pan)
+typedef enum {
+    ENCODER2_MODE_ZOOM = 0,
+    ENCODER2_MODE_PAN = 1
+} encoder2_mode_t;
+
 // Application state
 typedef struct {
     GtkApplication *app;
@@ -45,8 +51,9 @@ typedef struct {
     rotary_encoder_t *encoder1;       // Parameter control encoder
     rotary_encoder_t *encoder2;       // Zoom/pan control encoder
     GtkWidget *param_label;           // Shows active parameter
-    GtkWidget *zoom_label;            // Shows zoom level
+    GtkWidget *zoom_label;            // Shows zoom level and mode
     active_param_t active_param;      // Current parameter selection
+    encoder2_mode_t encoder2_mode;    // Zoom or pan mode
     int zoom_level;                   // 1, 2, 4
     int pan_offset;                   // Shared pan for spectrum/waterfall
 #endif
@@ -250,11 +257,12 @@ static void update_param_label(app_data_t *app_data) {
     gtk_label_set_markup(GTK_LABEL(app_data->param_label), label);
 }
 
-// Update zoom label display
+// Update zoom label display (shows mode and zoom level)
 static void update_zoom_label(app_data_t *app_data) {
-    char label[32];
-    snprintf(label, sizeof(label), "<span foreground='cyan' weight='bold'>Zoom: %dx</span>",
-             app_data->zoom_level);
+    char label[64];
+    const char *mode_str = (app_data->encoder2_mode == ENCODER2_MODE_ZOOM) ? "Zoom" : "Pan";
+    snprintf(label, sizeof(label), "<span foreground='cyan' weight='bold'>%s %dx</span>",
+             mode_str, app_data->zoom_level);
     gtk_label_set_markup(GTK_LABEL(app_data->zoom_label), label);
 }
 
@@ -308,54 +316,71 @@ static void on_encoder1_button(void *user_data) {
     update_param_label(app_data);
 }
 
-// Encoder 2 rotation callback - pans horizontally (only when zoom > 1)
+// Encoder 2 rotation callback - zooms or pans based on mode
 static void on_encoder2_rotation(int direction, void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
 
-    // Pan only works when zoomed in
-    if (app_data->zoom_level == 1) {
-        return;
+    if (app_data->encoder2_mode == ENCODER2_MODE_ZOOM) {
+        // Zoom mode: rotation changes zoom level
+        int new_zoom = app_data->zoom_level;
+
+        if (direction > 0) {
+            // Zoom in: 1 -> 2 -> 4
+            if (new_zoom < 4) new_zoom *= 2;
+        } else {
+            // Zoom out: 4 -> 2 -> 1
+            if (new_zoom > 1) new_zoom /= 2;
+        }
+
+        if (new_zoom != app_data->zoom_level) {
+            app_data->zoom_level = new_zoom;
+
+            // Reset pan when zoom changes
+            app_data->pan_offset = 0;
+
+            // Apply zoom and reset pan to both widgets
+            spectrum_widget_set_zoom(SPECTRUM_WIDGET(app_data->spectrum), app_data->zoom_level);
+            spectrum_widget_set_pan(SPECTRUM_WIDGET(app_data->spectrum), 0);
+            waterfall_widget_set_zoom(WATERFALL_WIDGET(app_data->waterfall), app_data->zoom_level);
+            waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), 0);
+
+            update_zoom_label(app_data);
+        }
+    } else {
+        // Pan mode: rotation translates horizontally (only when zoom > 1)
+        if (app_data->zoom_level == 1) {
+            return;  // No pan at 1x zoom
+        }
+
+        // Calculate pan step (number of bins per detent)
+        int visible_bins = FFT_SIZE / app_data->zoom_level;
+        int pan_step = visible_bins / 16;  // Pan 1/16 of visible area per detent
+        if (pan_step < 1) pan_step = 1;
+
+        // Update pan offset
+        app_data->pan_offset += direction * pan_step;
+
+        // Clamp to valid range
+        int max_pan = (FFT_SIZE - visible_bins) / 2;
+        if (app_data->pan_offset < -max_pan) app_data->pan_offset = -max_pan;
+        if (app_data->pan_offset > max_pan) app_data->pan_offset = max_pan;
+
+        // Apply pan to both widgets
+        spectrum_widget_set_pan(SPECTRUM_WIDGET(app_data->spectrum), app_data->pan_offset);
+        waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), app_data->pan_offset);
     }
-
-    // Calculate pan step (number of bins per detent)
-    int visible_bins = FFT_SIZE / app_data->zoom_level;
-    int pan_step = visible_bins / 16;  // Pan 1/16 of visible area per detent
-    if (pan_step < 1) pan_step = 1;
-
-    // Update pan offset
-    app_data->pan_offset += direction * pan_step;
-
-    // Clamp to valid range
-    int max_pan = (FFT_SIZE - visible_bins) / 2;
-    if (app_data->pan_offset < -max_pan) app_data->pan_offset = -max_pan;
-    if (app_data->pan_offset > max_pan) app_data->pan_offset = max_pan;
-
-    // Apply pan to both widgets
-    spectrum_widget_set_pan(SPECTRUM_WIDGET(app_data->spectrum), app_data->pan_offset);
-    waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), app_data->pan_offset);
 }
 
-// Encoder 2 button callback - cycles zoom level
+// Encoder 2 button callback - toggles between zoom and pan mode
 static void on_encoder2_button(void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
 
-    // Cycle zoom: 1 -> 2 -> 4 -> 1
-    if (app_data->zoom_level == 1) {
-        app_data->zoom_level = 2;
-    } else if (app_data->zoom_level == 2) {
-        app_data->zoom_level = 4;
+    // Toggle mode
+    if (app_data->encoder2_mode == ENCODER2_MODE_ZOOM) {
+        app_data->encoder2_mode = ENCODER2_MODE_PAN;
     } else {
-        app_data->zoom_level = 1;
+        app_data->encoder2_mode = ENCODER2_MODE_ZOOM;
     }
-
-    // Reset pan when zoom changes
-    app_data->pan_offset = 0;
-
-    // Apply zoom and reset pan to both widgets
-    spectrum_widget_set_zoom(SPECTRUM_WIDGET(app_data->spectrum), app_data->zoom_level);
-    spectrum_widget_set_pan(SPECTRUM_WIDGET(app_data->spectrum), 0);
-    waterfall_widget_set_zoom(WATERFALL_WIDGET(app_data->waterfall), app_data->zoom_level);
-    waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), 0);
 
     update_zoom_label(app_data);
 }
@@ -514,6 +539,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
         app_data->zoom_level = 1;
         app_data->pan_offset = 0;
         app_data->active_param = PARAM_SPECTRUM_REF;
+        app_data->encoder2_mode = ENCODER2_MODE_ZOOM;
 
         // Encoder 1 - Parameter control (GPIO 17/27/22)
         app_data->encoder1 = rotary_encoder_new_with_pins(
