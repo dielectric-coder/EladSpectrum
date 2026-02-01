@@ -438,6 +438,10 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
         "frame > label {"
         "  color: #FFFFFF;"
         "}"
+        "frame > border {"
+        "  border-color: #000000;"
+        "  border-width: 0px;"
+        "}"
         "paned > separator {"
         "  background-color: #333333;"
         "}";
