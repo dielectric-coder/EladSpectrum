@@ -38,7 +38,7 @@ typedef struct {
     GtkWidget *spectrum;
     GtkWidget *spectrum_frame;
     GtkWidget *waterfall;
-    GtkWidget *status_label;
+    GtkWidget *status_icon;
     GtkAdjustment *ref_adj;           // Spectrum reference level
     GtkAdjustment *range_adj;         // Spectrum dynamic range
     GtkAdjustment *waterfall_ref_adj;   // Waterfall reference level
@@ -155,9 +155,9 @@ static gboolean refresh_display(gpointer user_data) {
 
     // Update status
     if (atomic_load(&app_data->usb_connected)) {
-        gtk_label_set_text(GTK_LABEL(app_data->status_label), "Connected");
+        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "emblem-ok-symbolic");
     } else {
-        gtk_label_set_text(GTK_LABEL(app_data->status_label), "Searching for device...");
+        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "network-offline-symbolic");
     }
 
     // Poll frequency and mode from radio every ~10 frames (~300ms)
@@ -492,9 +492,9 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     app_data->waterfall_range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
     g_signal_connect(app_data->waterfall_range_adj, "value-changed", G_CALLBACK(on_waterfall_range_changed), app_data);
 
-    // Status label
-    app_data->status_label = gtk_label_new("Initializing...");
-    gtk_box_append(GTK_BOX(hbox), app_data->status_label);
+    // Status icon (at left of bar)
+    app_data->status_icon = gtk_image_new_from_icon_name("network-offline-symbolic");
+    gtk_box_prepend(GTK_BOX(hbox), app_data->status_icon);
 
 #ifdef HAVE_GPIOD
     // Parameter and zoom labels (only shown in Pi mode with encoder)
@@ -560,7 +560,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     app_data->usb = usb_device_new();
     if (!app_data->usb) {
         fprintf(stderr, "Failed to initialize USB\n");
-        gtk_label_set_text(GTK_LABEL(app_data->status_label), "USB init failed");
+        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "dialog-error-symbolic");
     }
 
     // Initialize CAT control
@@ -575,7 +575,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     app_data->fft = fft_processor_new(FFT_SIZE);
     if (!app_data->fft) {
         fprintf(stderr, "Failed to initialize FFT\n");
-        gtk_label_set_text(GTK_LABEL(app_data->status_label), "FFT init failed");
+        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "dialog-error-symbolic");
     }
 
 #ifdef HAVE_GPIOD
@@ -627,7 +627,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
 
     if (pthread_create(&app_data->usb_thread, NULL, usb_thread_func, app_data) != 0) {
         fprintf(stderr, "Failed to create USB thread\n");
-        gtk_label_set_text(GTK_LABEL(app_data->status_label), "Thread error");
+        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "dialog-error-symbolic");
     }
 
     // Start display refresh timer (~30 FPS)
