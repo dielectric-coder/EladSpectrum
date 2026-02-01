@@ -38,7 +38,7 @@ typedef struct {
     GtkWidget *spectrum;
     GtkWidget *spectrum_frame;
     GtkWidget *waterfall;
-    GtkWidget *status_icon;
+    GtkWidget *status_icon;  // Actually a label with colored circle
     GtkAdjustment *ref_adj;           // Spectrum reference level
     GtkAdjustment *range_adj;         // Spectrum dynamic range
     GtkAdjustment *waterfall_ref_adj;   // Waterfall reference level
@@ -155,11 +155,11 @@ static gboolean refresh_display(gpointer user_data) {
 
     // Update status
     if (atomic_load(&app_data->usb_connected)) {
-        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "emblem-ok-symbolic");
+        gtk_label_set_text(GTK_LABEL(app_data->status_icon), "●");
         gtk_widget_remove_css_class(GTK_WIDGET(app_data->status_icon), "disconnected");
         gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "connected");
     } else {
-        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "network-offline-symbolic");
+        gtk_label_set_text(GTK_LABEL(app_data->status_icon), "○");
         gtk_widget_remove_css_class(GTK_WIDGET(app_data->status_icon), "connected");
         gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "disconnected");
     }
@@ -456,11 +456,17 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
         "paned > separator {"
         "  background-color: #333333;"
         "}"
-        "image.connected {"
+        ".status-indicator {"
+        "  font-size: 24px;"
+        "}"
+        ".connected {"
         "  color: #00FF00;"
         "}"
-        "image.disconnected {"
+        ".disconnected {"
         "  color: #888888;"
+        "}"
+        ".error {"
+        "  color: #FF0000;"
         "}";
     gtk_css_provider_load_from_data(css_provider, css, -1);
     gtk_style_context_add_provider_for_display(
@@ -509,9 +515,10 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     app_data->waterfall_range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
     g_signal_connect(app_data->waterfall_range_adj, "value-changed", G_CALLBACK(on_waterfall_range_changed), app_data);
 
-    // Status icon (at left of bar)
-    app_data->status_icon = gtk_image_new_from_icon_name("network-offline-symbolic");
-    gtk_image_set_pixel_size(GTK_IMAGE(app_data->status_icon), 24);
+    // Status indicator (at left of bar) - colored circle
+    app_data->status_icon = gtk_label_new("○");
+    gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "status-indicator");
+    gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "disconnected");
     gtk_box_prepend(GTK_BOX(hbox), app_data->status_icon);
 
 #ifdef HAVE_GPIOD
@@ -578,7 +585,8 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     app_data->usb = usb_device_new();
     if (!app_data->usb) {
         fprintf(stderr, "Failed to initialize USB\n");
-        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "dialog-error-symbolic");
+        gtk_label_set_text(GTK_LABEL(app_data->status_icon), "✖");
+        gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "error");
     }
 
     // Initialize CAT control
@@ -593,7 +601,8 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     app_data->fft = fft_processor_new(FFT_SIZE);
     if (!app_data->fft) {
         fprintf(stderr, "Failed to initialize FFT\n");
-        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "dialog-error-symbolic");
+        gtk_label_set_text(GTK_LABEL(app_data->status_icon), "✖");
+        gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "error");
     }
 
 #ifdef HAVE_GPIOD
@@ -645,7 +654,8 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
 
     if (pthread_create(&app_data->usb_thread, NULL, usb_thread_func, app_data) != 0) {
         fprintf(stderr, "Failed to create USB thread\n");
-        gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "dialog-error-symbolic");
+        gtk_label_set_text(GTK_LABEL(app_data->status_icon), "✖");
+        gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "error");
     }
 
     // Start display refresh timer (~30 FPS)
