@@ -501,6 +501,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
 
     // Status icon (at left of bar)
     app_data->status_icon = gtk_image_new_from_icon_name("network-offline-symbolic");
+    gtk_image_set_pixel_size(GTK_IMAGE(app_data->status_icon), 24);
     gtk_box_prepend(GTK_BOX(hbox), app_data->status_icon);
 
 #ifdef HAVE_GPIOD
