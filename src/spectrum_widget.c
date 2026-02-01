@@ -229,10 +229,10 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         cairo_text_extents_t extents;
         cairo_text_extents(cr, overlay_text, &extents);
 
-        // Position centered in plot area, near top
+        // Position centered in plot area, at top
         double text_x = plot_x + (plot_width - extents.width) / 2;
-        double text_y = plot_y + 30;
-        double padding = 6;
+        double padding = 4;
+        double text_y = plot_y + extents.height + padding * 2;
 
         // Draw semi-transparent background
         cairo_set_source_rgba(cr, 0.0, 0.0, 0.0, 0.6);
