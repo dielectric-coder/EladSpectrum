@@ -52,6 +52,7 @@ typedef struct {
     rotary_encoder_t *encoder2;       // Zoom/pan control encoder
     GtkWidget *param_label;           // Shows active parameter
     GtkWidget *zoom_label;            // Shows zoom level and mode
+    GtkWidget *param_spin;            // Single spinbutton (Pi mode only)
     active_param_t active_param;      // Current parameter selection
     encoder2_mode_t encoder2_mode;    // Zoom or pan mode
     int zoom_level;                   // 1, 2, 4
@@ -270,12 +271,32 @@ static const char *param_names[] = {
     "WF.RNG"
 };
 
+// Get adjustment for current parameter
+static GtkAdjustment *get_active_adjustment(app_data_t *app_data) {
+    switch (app_data->active_param) {
+        case PARAM_SPECTRUM_REF:    return app_data->ref_adj;
+        case PARAM_SPECTRUM_RANGE:  return app_data->range_adj;
+        case PARAM_WATERFALL_REF:   return app_data->waterfall_ref_adj;
+        case PARAM_WATERFALL_RANGE: return app_data->waterfall_range_adj;
+        default:                    return app_data->ref_adj;
+    }
+}
+
 // Update parameter label display
 static void update_param_label(app_data_t *app_data) {
     char label[64];
     snprintf(label, sizeof(label), "<span foreground='cyan' weight='bold'>%s</span>",
              param_names[app_data->active_param]);
     gtk_label_set_markup(GTK_LABEL(app_data->param_label), label);
+}
+
+// Update spinbutton to show current parameter's value
+static void update_param_spinbutton(app_data_t *app_data) {
+    if (!app_data->param_spin) return;
+    GtkAdjustment *adj = get_active_adjustment(app_data);
+    gtk_spin_button_set_adjustment(GTK_SPIN_BUTTON(app_data->param_spin), adj);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(app_data->param_spin),
+                              gtk_adjustment_get_value(adj));
 }
 
 // Update zoom label display (shows mode and zoom level)
@@ -335,6 +356,7 @@ static void on_encoder1_button(void *user_data) {
     app_data->active_param = (app_data->active_param + 1) % PARAM_COUNT;
 
     update_param_label(app_data);
+    update_param_spinbutton(app_data);
 }
 
 // Encoder 2 rotation callback - zooms or pans based on mode
@@ -490,47 +512,52 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     gtk_widget_set_halign(hbox, GTK_ALIGN_CENTER);
 
-    // Spectrum Reference level (max dB) control
-    GtkWidget *ref_label = gtk_label_new("Ref");
-    gtk_box_append(GTK_BOX(hbox), ref_label);
+    // Status indicator - colored circle
+    app_data->status_icon = gtk_label_new("○");
+    gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "status-indicator");
+    gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "disconnected");
+    gtk_box_append(GTK_BOX(hbox), app_data->status_icon);
 
+    // Create all adjustments first
     app_data->ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
-    GtkWidget *ref_spin = gtk_spin_button_new(app_data->ref_adj, 1.0, 0);
     g_signal_connect(app_data->ref_adj, "value-changed", G_CALLBACK(on_spectrum_range_changed), app_data);
-    gtk_box_append(GTK_BOX(hbox), ref_spin);
-
-    // Spectrum Range (dB span) control
-    GtkWidget *range_label = gtk_label_new("Rng");
-    gtk_box_append(GTK_BOX(hbox), range_label);
 
     app_data->range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
-    GtkWidget *range_spin = gtk_spin_button_new(app_data->range_adj, 1.0, 0);
     g_signal_connect(app_data->range_adj, "value-changed", G_CALLBACK(on_spectrum_range_changed), app_data);
-    gtk_box_append(GTK_BOX(hbox), range_spin);
 
-    // Waterfall adjustments (use same initial values as spectrum, but independent)
     app_data->waterfall_ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
     g_signal_connect(app_data->waterfall_ref_adj, "value-changed", G_CALLBACK(on_waterfall_range_changed), app_data);
 
     app_data->waterfall_range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
     g_signal_connect(app_data->waterfall_range_adj, "value-changed", G_CALLBACK(on_waterfall_range_changed), app_data);
 
-    // Status indicator (at left of bar) - colored circle
-    app_data->status_icon = gtk_label_new("○");
-    gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "status-indicator");
-    gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "disconnected");
-    gtk_box_prepend(GTK_BOX(hbox), app_data->status_icon);
-
 #ifdef HAVE_GPIOD
-    // Parameter and zoom labels (only shown in Pi mode with encoder)
     if (app_data->pi_mode) {
+        // Pi mode: single spinbutton controlled by encoder
+        app_data->param_spin = gtk_spin_button_new(app_data->ref_adj, 1.0, 0);
+        gtk_box_append(GTK_BOX(hbox), app_data->param_spin);
+
         app_data->param_label = gtk_label_new(NULL);
         gtk_box_append(GTK_BOX(hbox), app_data->param_label);
 
         app_data->zoom_label = gtk_label_new(NULL);
         gtk_box_append(GTK_BOX(hbox), app_data->zoom_label);
-    }
+    } else
 #endif
+    {
+        // Normal mode: separate Ref and Rng spinbuttons
+        GtkWidget *ref_label = gtk_label_new("Ref");
+        gtk_box_append(GTK_BOX(hbox), ref_label);
+
+        GtkWidget *ref_spin = gtk_spin_button_new(app_data->ref_adj, 1.0, 0);
+        gtk_box_append(GTK_BOX(hbox), ref_spin);
+
+        GtkWidget *range_label = gtk_label_new("Rng");
+        gtk_box_append(GTK_BOX(hbox), range_label);
+
+        GtkWidget *range_spin = gtk_spin_button_new(app_data->range_adj, 1.0, 0);
+        gtk_box_append(GTK_BOX(hbox), range_spin);
+    }
 
     // Paned container for spectrum and waterfall
     GtkWidget *paned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
