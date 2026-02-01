@@ -27,6 +27,12 @@ void spectrum_widget_set_sample_rate(SpectrumWidget *widget, int sample_rate);
 // Set overlay text (frequency and mode) displayed on top of spectrum
 void spectrum_widget_set_overlay(SpectrumWidget *widget, const char *freq_str, const char *mode_str);
 
+// Set horizontal zoom level (1, 2, 4, 8 = divisor of displayed frequency span)
+void spectrum_widget_set_zoom(SpectrumWidget *widget, int zoom_level);
+
+// Get current zoom level
+int spectrum_widget_get_zoom(SpectrumWidget *widget);
+
 G_END_DECLS
 
 #endif // SPECTRUM_WIDGET_H

@@ -23,6 +23,7 @@ struct _WaterfallWidget {
     // Display parameters
     float min_db;
     float max_db;
+    int zoom_level;  // 1, 2, 4, 8 = horizontal zoom factor
 };
 
 G_DEFINE_TYPE(WaterfallWidget, waterfall_widget, GTK_TYPE_DRAWING_AREA)
@@ -164,6 +165,7 @@ static void waterfall_widget_init(WaterfallWidget *self) {
     self->surface_height = 0;
     self->min_db = -120.0f;
     self->max_db = 0.0f;
+    self->zoom_level = 1;
 
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(self), waterfall_widget_draw, NULL, NULL);
 }
@@ -201,11 +203,15 @@ void waterfall_widget_add_line(WaterfallWidget *widget, const float *spectrum_db
         float range = widget->max_db - widget->min_db;
         if (range < 1.0f) range = 1.0f;
 
+        // Calculate visible bin range based on zoom level
+        int visible_bins = size / widget->zoom_level;
+        int start_bin = (size - visible_bins) / 2;
+
         uint32_t *row = (uint32_t *)data;
         for (int x = 0; x < width; x++) {
-            // Map x to spectrum bin
-            int bin = x * size / width;
-            if (bin >= size) bin = size - 1;
+            // Map x to spectrum bin (within zoomed range)
+            int bin = start_bin + x * visible_bins / width;
+            if (bin >= start_bin + visible_bins) bin = start_bin + visible_bins - 1;
 
             float db = spectrum_db[bin];
             if (db < widget->min_db) db = widget->min_db;
@@ -253,4 +259,22 @@ void waterfall_widget_clear(WaterfallWidget *widget) {
     g_mutex_unlock(&widget->data_mutex);
 
     gtk_widget_queue_draw(GTK_WIDGET(widget));
+}
+
+void waterfall_widget_set_zoom(WaterfallWidget *widget, int zoom_level) {
+    if (!widget) return;
+    // Clamp to valid zoom levels
+    if (zoom_level < 1) zoom_level = 1;
+    if (zoom_level > 8) zoom_level = 8;
+
+    if (widget->zoom_level != zoom_level) {
+        widget->zoom_level = zoom_level;
+        // Clear waterfall when zoom changes for clean display
+        waterfall_widget_clear(widget);
+    }
+}
+
+int waterfall_widget_get_zoom(WaterfallWidget *widget) {
+    if (!widget) return 1;
+    return widget->zoom_level;
 }

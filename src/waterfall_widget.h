@@ -21,6 +21,12 @@ void waterfall_widget_set_range(WaterfallWidget *widget, float min_db, float max
 // Clear waterfall history
 void waterfall_widget_clear(WaterfallWidget *widget);
 
+// Set horizontal zoom level (1, 2, 4, 8 = divisor of displayed frequency span)
+void waterfall_widget_set_zoom(WaterfallWidget *widget, int zoom_level);
+
+// Get current zoom level
+int waterfall_widget_get_zoom(WaterfallWidget *widget);
+
 G_END_DECLS
 
 #endif // WATERFALL_WIDGET_H

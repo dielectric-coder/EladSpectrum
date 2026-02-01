@@ -16,6 +16,7 @@ struct _SpectrumWidget {
     float max_db;
     int center_freq_hz;
     int sample_rate;
+    int zoom_level;  // 1, 2, 4, 8 = horizontal zoom factor
 
     // Overlay text
     char overlay_freq[32];
@@ -87,9 +88,9 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         cairo_show_text(cr, label);
     }
 
-    // Draw frequency labels in bottom margin
+    // Draw frequency labels in bottom margin (adjusted for zoom)
     if (self->sample_rate > 0) {
-        double freq_span = self->sample_rate;
+        double freq_span = self->sample_rate / self->zoom_level;
         double freq_start = self->center_freq_hz - freq_span / 2;
 
         for (int i = 0; i <= num_v_lines; i++) {
@@ -113,15 +114,20 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         }
     }
 
-    // Draw spectrum in plot area
+    // Draw spectrum in plot area (with zoom support)
     if (self->spectrum_db && self->spectrum_size > 0) {
+        // Calculate visible bin range based on zoom level
+        int visible_bins = self->spectrum_size / self->zoom_level;
+        int start_bin = (self->spectrum_size - visible_bins) / 2;
+        int end_bin = start_bin + visible_bins;
+
         // Draw spectrum line (cyan)
         cairo_set_source_rgb(cr, 0.0, 1.0, 1.0);
         cairo_set_line_width(cr, 1.0);
 
         int first = 1;
-        for (int i = 0; i < self->spectrum_size; i++) {
-            double x = plot_x + (double)i / (self->spectrum_size - 1) * plot_width;
+        for (int i = start_bin; i < end_bin; i++) {
+            double x = plot_x + (double)(i - start_bin) / (visible_bins - 1) * plot_width;
             float db = self->spectrum_db[i];
 
             // Clamp to display range
@@ -143,8 +149,8 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         // Fill under the spectrum with transparent cyan
         cairo_set_source_rgba(cr, 0.0, 1.0, 1.0, 0.2);
         first = 1;
-        for (int i = 0; i < self->spectrum_size; i++) {
-            double x = plot_x + (double)i / (self->spectrum_size - 1) * plot_width;
+        for (int i = start_bin; i < end_bin; i++) {
+            double x = plot_x + (double)(i - start_bin) / (visible_bins - 1) * plot_width;
             float db = self->spectrum_db[i];
 
             if (db < self->min_db) db = self->min_db;
@@ -225,6 +231,7 @@ static void spectrum_widget_init(SpectrumWidget *self) {
     self->max_db = 0.0f;
     self->center_freq_hz = 14200000;
     self->sample_rate = DEFAULT_SAMPLE_RATE;
+    self->zoom_level = 1;
     self->overlay_freq[0] = '\0';
     self->overlay_mode[0] = '\0';
 
@@ -294,4 +301,18 @@ void spectrum_widget_set_overlay(SpectrumWidget *widget, const char *freq_str, c
     g_mutex_unlock(&widget->data_mutex);
 
     gtk_widget_queue_draw(GTK_WIDGET(widget));
+}
+
+void spectrum_widget_set_zoom(SpectrumWidget *widget, int zoom_level) {
+    if (!widget) return;
+    // Clamp to valid zoom levels
+    if (zoom_level < 1) zoom_level = 1;
+    if (zoom_level > 8) zoom_level = 8;
+    widget->zoom_level = zoom_level;
+    gtk_widget_queue_draw(GTK_WIDGET(widget));
+}
+
+int spectrum_widget_get_zoom(SpectrumWidget *widget) {
+    if (!widget) return 1;
+    return widget->zoom_level;
 }

@@ -32,8 +32,8 @@ typedef struct {
     cat_control_t *cat;
 #ifdef HAVE_GPIOD
     rotary_encoder_t *encoder;
-    GtkWidget *ref_label;
-    GtkWidget *range_label;
+    GtkWidget *zoom_label;
+    int zoom_level;  // 1, 2, 4
 #endif
 
     pthread_t usb_thread;
@@ -210,48 +210,48 @@ static void on_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_dat
 }
 
 #ifdef HAVE_GPIOD
-// Update label highlighting to show active encoder parameter
-static void update_encoder_highlight(app_data_t *app_data) {
-    encoder_param_t active = rotary_encoder_get_active_param(app_data->encoder);
-
-    // Use Pango markup for highlighting - cyan for active, default for inactive
-    if (active == ENCODER_PARAM_REF) {
-        gtk_label_set_markup(GTK_LABEL(app_data->ref_label),
-                             "<span foreground='cyan' weight='bold'>Ref:</span>");
-        gtk_label_set_text(GTK_LABEL(app_data->range_label), "Range:");
-    } else {
-        gtk_label_set_text(GTK_LABEL(app_data->ref_label), "Ref:");
-        gtk_label_set_markup(GTK_LABEL(app_data->range_label),
-                             "<span foreground='cyan' weight='bold'>Range:</span>");
-    }
+// Update zoom label display
+static void update_zoom_label(app_data_t *app_data) {
+    char label[32];
+    snprintf(label, sizeof(label), "<span foreground='cyan' weight='bold'>Zoom: %dx</span>",
+             app_data->zoom_level);
+    gtk_label_set_markup(GTK_LABEL(app_data->zoom_label), label);
 }
 
-// Encoder rotation callback
+// Encoder rotation callback - adjusts Ref level
 static void on_encoder_rotation(int direction, void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
-    encoder_param_t active = rotary_encoder_get_active_param(app_data->encoder);
 
-    GtkAdjustment *adj = (active == ENCODER_PARAM_REF)
-                         ? app_data->ref_adj : app_data->range_adj;
-
-    // Step sizes: 1 dB for ref, 5 dB for range
-    double step = (active == ENCODER_PARAM_REF) ? 1.0 : 5.0;
-    double value = gtk_adjustment_get_value(adj);
-    double new_value = value + (direction * step);
+    double value = gtk_adjustment_get_value(app_data->ref_adj);
+    double new_value = value + (direction * 1.0);  // 1 dB per detent
 
     // Clamp to adjustment bounds
-    double lower = gtk_adjustment_get_lower(adj);
-    double upper = gtk_adjustment_get_upper(adj);
+    double lower = gtk_adjustment_get_lower(app_data->ref_adj);
+    double upper = gtk_adjustment_get_upper(app_data->ref_adj);
     if (new_value < lower) new_value = lower;
     if (new_value > upper) new_value = upper;
 
-    gtk_adjustment_set_value(adj, new_value);
+    gtk_adjustment_set_value(app_data->ref_adj, new_value);
 }
 
-// Encoder button callback
+// Encoder button callback - cycles zoom level
 static void on_encoder_button(void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
-    update_encoder_highlight(app_data);
+
+    // Cycle zoom: 1 -> 2 -> 4 -> 1
+    if (app_data->zoom_level == 1) {
+        app_data->zoom_level = 2;
+    } else if (app_data->zoom_level == 2) {
+        app_data->zoom_level = 4;
+    } else {
+        app_data->zoom_level = 1;
+    }
+
+    // Apply zoom to both widgets
+    spectrum_widget_set_zoom(SPECTRUM_WIDGET(app_data->spectrum), app_data->zoom_level);
+    waterfall_widget_set_zoom(WATERFALL_WIDGET(app_data->waterfall), app_data->zoom_level);
+
+    update_zoom_label(app_data);
 }
 #endif
 
@@ -293,13 +293,8 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_box_append(GTK_BOX(vbox), hbox);
 
     // Reference level (max dB) control
-#ifdef HAVE_GPIOD
-    app_data->ref_label = gtk_label_new("Ref:");
-    gtk_box_append(GTK_BOX(hbox), app_data->ref_label);
-#else
     GtkWidget *ref_label = gtk_label_new("Ref:");
     gtk_box_append(GTK_BOX(hbox), ref_label);
-#endif
 
     app_data->ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
     GtkWidget *ref_spin = gtk_spin_button_new(app_data->ref_adj, 1.0, 0);
@@ -307,13 +302,8 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_box_append(GTK_BOX(hbox), ref_spin);
 
     // Range (dB span) control
-#ifdef HAVE_GPIOD
-    app_data->range_label = gtk_label_new("Range:");
-    gtk_box_append(GTK_BOX(hbox), app_data->range_label);
-#else
     GtkWidget *range_label = gtk_label_new("Range:");
     gtk_box_append(GTK_BOX(hbox), range_label);
-#endif
 
     app_data->range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
     GtkWidget *range_spin = gtk_spin_button_new(app_data->range_adj, 1.0, 0);
@@ -323,6 +313,14 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     // Status label
     app_data->status_label = gtk_label_new("Initializing...");
     gtk_box_append(GTK_BOX(hbox), app_data->status_label);
+
+#ifdef HAVE_GPIOD
+    // Zoom label (only shown in Pi mode with encoder)
+    if (app_data->pi_mode) {
+        app_data->zoom_label = gtk_label_new(NULL);
+        gtk_box_append(GTK_BOX(hbox), app_data->zoom_label);
+    }
+#endif
 
     // Paned container for spectrum and waterfall
     GtkWidget *paned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
@@ -394,6 +392,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
 #ifdef HAVE_GPIOD
     // Initialize rotary encoder (Pi mode only)
     if (app_data->pi_mode) {
+        app_data->zoom_level = 1;
         app_data->encoder = rotary_encoder_new();
         if (app_data->encoder) {
             rotary_encoder_set_rotation_callback(app_data->encoder,
@@ -401,10 +400,12 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
             rotary_encoder_set_button_callback(app_data->encoder,
                                                on_encoder_button, app_data);
             rotary_encoder_start_polling(app_data->encoder);
-            update_encoder_highlight(app_data);
+            update_zoom_label(app_data);
             fprintf(stderr, "Rotary encoder initialized\n");
         } else {
             fprintf(stderr, "Rotary encoder not available\n");
+            // Still show zoom label even without encoder
+            update_zoom_label(app_data);
         }
     }
 #endif
