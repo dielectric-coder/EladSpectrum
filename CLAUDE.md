@@ -95,10 +95,17 @@ Optional GPIO rotary encoder support for hands-free parameter adjustment in Pi m
 
 ### Operation
 
-- **Rotation**: Adjusts the active parameter (Ref Level or Range)
-- **Button press**: Toggles between Ref Level and Range
-- **Visual feedback**: Active parameter label highlighted in cyan
-- **Step sizes**: 1 dB per detent for Ref, 5 dB for Range
+- **Rotation**: Adjusts Reference Level (1 dB per detent)
+- **Button press**: Cycles horizontal zoom (1x → 2x → 4x → 1x)
+- **Visual feedback**: Zoom level displayed in cyan ("Zoom: Nx")
+
+### Zoom Levels
+
+| Zoom | Frequency Span | Resolution |
+|------|----------------|------------|
+| 1x | 192 kHz (full) | 46.9 Hz/bin |
+| 2x | 96 kHz (center) | 23.4 Hz/bin |
+| 4x | 48 kHz (center) | 11.7 Hz/bin |
 
 ### Notes
 
@@ -156,7 +163,7 @@ meson compile -C build
 - **Ref**: Reference level (top of spectrum display in dB)
 - **Range**: Dynamic range (dB span from ref to bottom)
 - **Overlay**: Frequency and mode displayed centered on spectrum (cyan text)
-- **Encoder highlight**: Active parameter label shown in cyan bold (Pi mode with encoder)
+- **Zoom**: Current zoom level shown in cyan (Pi mode with encoder)
 
 ## Notes
 
