@@ -54,7 +54,7 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
 
     // Set up font for labels
     cairo_select_font_face(cr, "monospace", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 10);
+    cairo_set_font_size(cr, 12);
 
     // Draw grid lines in plot area
     cairo_set_source_rgba(cr, 0.3, 0.3, 0.3, 1.0);
