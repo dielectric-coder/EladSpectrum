@@ -156,8 +156,12 @@ static gboolean refresh_display(gpointer user_data) {
     // Update status
     if (atomic_load(&app_data->usb_connected)) {
         gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "emblem-ok-symbolic");
+        gtk_widget_remove_css_class(GTK_WIDGET(app_data->status_icon), "disconnected");
+        gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "connected");
     } else {
         gtk_image_set_from_icon_name(GTK_IMAGE(app_data->status_icon), "network-offline-symbolic");
+        gtk_widget_remove_css_class(GTK_WIDGET(app_data->status_icon), "connected");
+        gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "disconnected");
     }
 
     // Poll frequency and mode from radio every ~10 frames (~300ms)
@@ -451,6 +455,12 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
         "}"
         "paned > separator {"
         "  background-color: #333333;"
+        "}"
+        "image.connected {"
+        "  color: #00FF00;"
+        "}"
+        "image.disconnected {"
+        "  color: #888888;"
         "}";
     gtk_css_provider_load_from_data(css_provider, css, -1);
     gtk_style_context_add_provider_for_display(
