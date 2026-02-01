@@ -260,10 +260,10 @@ static void on_waterfall_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointe
 #ifdef HAVE_GPIOD
 // Parameter names for display
 static const char *param_names[] = {
-    "Spectrum Ref",
-    "Spectrum Range",
-    "Waterfall Ref",
-    "Waterfall Range"
+    "SP.REF",
+    "SP.RNG",
+    "WF.REF",
+    "WF.RNG"
 };
 
 // Update parameter label display
@@ -475,7 +475,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_widget_set_halign(hbox, GTK_ALIGN_CENTER);
 
     // Spectrum Reference level (max dB) control
-    GtkWidget *ref_label = gtk_label_new("Ref:");
+    GtkWidget *ref_label = gtk_label_new("Ref");
     gtk_box_append(GTK_BOX(hbox), ref_label);
 
     app_data->ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
@@ -484,7 +484,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_box_append(GTK_BOX(hbox), ref_spin);
 
     // Spectrum Range (dB span) control
-    GtkWidget *range_label = gtk_label_new("Range:");
+    GtkWidget *range_label = gtk_label_new("Rng");
     gtk_box_append(GTK_BOX(hbox), range_label);
 
     app_data->range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
