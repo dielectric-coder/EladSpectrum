@@ -112,9 +112,12 @@ Controls display parameters with independent spectrum/waterfall settings.
 Controls horizontal zoom and panning with mode toggle.
 
 - **Button press**: Toggles between Zoom mode and Pan mode
-- **Rotation in Zoom mode**: Changes zoom level (1x ↔ 2x ↔ 4x)
+- **Rotation in Zoom mode**: Changes zoom level
+  - Clockwise: zoom in (1x → 2x → 4x)
+  - Counter-clockwise: zoom out (4x → 2x → 1x)
   - Pan resets to center when zoom changes
 - **Rotation in Pan mode**: Translates spectrum/waterfall horizontally
+  - Clockwise: pan right, Counter-clockwise: pan left
   - Only effective when zoom > 1x
 - **Visual feedback**: Mode and zoom level displayed in cyan ("Zoom 2x" or "Pan 2x")
 
