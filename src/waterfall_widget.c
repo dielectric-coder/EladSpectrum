@@ -113,7 +113,7 @@ static void waterfall_widget_draw(GtkDrawingArea *area, cairo_t *cr,
 
     // Draw time labels in left margin
     cairo_select_font_face(cr, "monospace", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 10);
+    cairo_set_font_size(cr, 12);
     cairo_set_source_rgba(cr, 0.7, 0.7, 0.7, 1.0);
 
     // Calculate total time span visible
