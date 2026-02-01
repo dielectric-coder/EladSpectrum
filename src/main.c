@@ -424,6 +424,30 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_window_set_title(GTK_WINDOW(app_data->window), "Elad FDM-DUO Spectrum");
     gtk_window_set_default_size(GTK_WINDOW(app_data->window), app_data->window_width, app_data->window_height);
 
+    // Apply CSS styling - cyan background with dark cyan text
+    GtkCssProvider *css_provider = gtk_css_provider_new();
+    const char *css =
+        "window, box, paned, frame, label, button, spinbutton, entry {"
+        "  background-color: #00FFFF;"
+        "  color: #008B8B;"
+        "}"
+        "spinbutton text, entry text {"
+        "  background-color: #00FFFF;"
+        "  color: #008B8B;"
+        "}"
+        "frame > label {"
+        "  color: #008B8B;"
+        "}"
+        "paned > separator {"
+        "  background-color: #008B8B;"
+        "}";
+    gtk_css_provider_load_from_data(css_provider, css, -1);
+    gtk_style_context_add_provider_for_display(
+        gdk_display_get_default(),
+        GTK_STYLE_PROVIDER(css_provider),
+        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref(css_provider);
+
     // Connect close handler
     g_signal_connect(app_data->window, "close-request", G_CALLBACK(on_window_close), app_data);
 
