@@ -428,18 +428,18 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     GtkCssProvider *css_provider = gtk_css_provider_new();
     const char *css =
         "window, box, paned, frame, label, button, spinbutton, entry {"
-        "  background-color: #00CCCC;"
-        "  color: #006666;"
+        "  background-color: #000000;"
+        "  color: #FFFFFF;"
         "}"
         "spinbutton text, entry text {"
-        "  background-color: #00CCCC;"
-        "  color: #006666;"
+        "  background-color: #000000;"
+        "  color: #FFFFFF;"
         "}"
         "frame > label {"
-        "  color: #006666;"
+        "  color: #FFFFFF;"
         "}"
         "paned > separator {"
-        "  background-color: #006666;"
+        "  background-color: #333333;"
         "}";
     gtk_css_provider_load_from_data(css_provider, css, -1);
     gtk_style_context_add_provider_for_display(
