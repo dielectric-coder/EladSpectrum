@@ -16,6 +16,7 @@ This project provides a spectrum analyzer application for the Elad FDM-DUO Softw
 - **GUI Framework**: GTK4
 - **FFT Library**: FFTW3
 - **USB Library**: libusb-1.0
+- **GPIO Library**: libgpiod (optional, for Raspberry Pi rotary encoder)
 - **Build System**: Meson
 
 ## Current Status
@@ -54,7 +55,8 @@ EladSpectrum/
 │   ├── cat_control.c/h      # CAT serial control (frequency/mode polling)
 │   ├── fft_processor.c/h    # FFT computation with FFTW3
 │   ├── spectrum_widget.c/h  # Spectrum display GtkDrawingArea
-│   └── waterfall_widget.c/h # Waterfall display GtkDrawingArea
+│   ├── waterfall_widget.c/h # Waterfall display GtkDrawingArea
+│   └── rotary_encoder.c/h   # GPIO rotary encoder (Pi only, optional)
 └── examples/                # Reference implementations
     ├── main.c               # Direct USB communication example
     ├── elad-server.c        # Network server with UDP/TCP
@@ -79,11 +81,39 @@ EladSpectrum/
 - **Averaging**: 3 frames
 - **Update Rate**: ~15.6 lines/second (192000 / 4096 / 3)
 
+## Rotary Encoder (Raspberry Pi)
+
+Optional GPIO rotary encoder support for hands-free parameter adjustment in Pi mode.
+
+### Hardware Setup
+
+| Pin | GPIO (BCM) | Function |
+|-----|------------|----------|
+| CLK | 17 | Rotation clock (A) |
+| DT  | 27 | Rotation data (B) |
+| SW  | 22 | Push button |
+
+### Operation
+
+- **Rotation**: Adjusts the active parameter (Ref Level or Range)
+- **Button press**: Toggles between Ref Level and Range
+- **Visual feedback**: Active parameter label highlighted in cyan
+- **Step sizes**: 1 dB per detent for Ref, 5 dB for Range
+
+### Notes
+
+- Only enabled when running in Pi mode (`-p` flag)
+- Requires libgpiod library (auto-detected at build time)
+- Builds without encoder support if libgpiod is not available
+
 ## Dependencies
 
 ```bash
 # Debian/Ubuntu
 sudo apt install libgtk-4-dev libusb-1.0-0-dev libfftw3-dev meson ninja-build
+
+# Raspberry Pi (optional, for rotary encoder support)
+sudo apt install libgpiod-dev
 ```
 
 ## Build
@@ -117,7 +147,7 @@ meson compile -C build
 | Option | Description |
 |--------|-------------|
 | `-f, --fullscreen` | Start in fullscreen mode |
-| `-p, --pi` | Set window size to 800x480 (5" LCD) |
+| `-p, --pi` | Set window size to 800x480 (5" LCD), enable rotary encoder |
 | `-h, --help` | Show help message |
 
 ## UI Controls
@@ -126,6 +156,7 @@ meson compile -C build
 - **Ref**: Reference level (top of spectrum display in dB)
 - **Range**: Dynamic range (dB span from ref to bottom)
 - **Overlay**: Frequency and mode displayed centered on spectrum (cyan text)
+- **Encoder highlight**: Active parameter label shown in cyan bold (Pi mode with encoder)
 
 ## Notes
 
