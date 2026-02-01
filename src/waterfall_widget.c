@@ -119,7 +119,7 @@ static void waterfall_widget_draw(GtkDrawingArea *area, cairo_t *cr,
     // Calculate total time span visible
     float total_seconds = height / LINES_PER_SECOND;
 
-    // Draw time labels at regular intervals
+    // Draw time labels at regular intervals (right-justified)
     int num_labels = 5;
     for (int i = 0; i <= num_labels; i++) {
         double y = (double)i / num_labels * height;
@@ -133,7 +133,9 @@ static void waterfall_widget_draw(GtkDrawingArea *area, cairo_t *cr,
             int secs = (int)seconds % 60;
             snprintf(label, sizeof(label), "%d:%02d", mins, secs);
         }
-        cairo_move_to(cr, 5, y + 4);
+        cairo_text_extents_t extents;
+        cairo_text_extents(cr, label, &extents);
+        cairo_move_to(cr, MARGIN_LEFT - extents.width - 5, y + 4);
         cairo_show_text(cr, label);
     }
 }

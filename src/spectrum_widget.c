@@ -78,14 +78,16 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
     }
     cairo_stroke(cr);
 
-    // Draw dB labels in left margin
+    // Draw dB labels in left margin (right-justified)
     cairo_set_source_rgba(cr, 0.7, 0.7, 0.7, 1.0);
     for (int i = 0; i <= num_h_lines; i++) {
         double y = plot_y + (double)i / num_h_lines * plot_height;
         float db = self->max_db - (float)i / num_h_lines * range;
         char label[16];
         snprintf(label, sizeof(label), "%+.0f", db);
-        cairo_move_to(cr, 5, y + 4);
+        cairo_text_extents_t extents;
+        cairo_text_extents(cr, label, &extents);
+        cairo_move_to(cr, MARGIN_LEFT - extents.width - 5, y + 4);
         cairo_show_text(cr, label);
     }
 
