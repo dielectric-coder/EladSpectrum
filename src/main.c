@@ -459,10 +459,9 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_widget_set_margin_bottom(vbox, 5);
     gtk_window_set_child(GTK_WINDOW(app_data->window), vbox);
 
-    // Control bar - centered
+    // Control bar - centered (will be added at bottom later)
     GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     gtk_widget_set_halign(hbox, GTK_ALIGN_CENTER);
-    gtk_box_append(GTK_BOX(vbox), hbox);
 
     // Spectrum Reference level (max dB) control
     GtkWidget *ref_label = gtk_label_new("Ref:");
@@ -509,10 +508,10 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_widget_set_vexpand(paned, TRUE);
     gtk_box_append(GTK_BOX(vbox), paned);
 
-    // Spectrum widget
+    // Spectrum widget (same height as waterfall)
     app_data->spectrum = spectrum_widget_new();
-    int spectrum_min_h = (app_data->window_height <= 480) ? 120 : 200;
-    gtk_widget_set_size_request(app_data->spectrum, -1, spectrum_min_h);
+    int display_min_h = (app_data->window_height <= 480) ? 100 : 150;
+    gtk_widget_set_size_request(app_data->spectrum, -1, display_min_h);
     spectrum_widget_set_center_freq(SPECTRUM_WIDGET(app_data->spectrum), app_data->center_freq_hz);
     spectrum_widget_set_sample_rate(SPECTRUM_WIDGET(app_data->spectrum), DEFAULT_SAMPLE_RATE);
 
@@ -532,10 +531,9 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_paned_set_resize_start_child(GTK_PANED(paned), TRUE);
     gtk_paned_set_shrink_start_child(GTK_PANED(paned), TRUE);
 
-    // Waterfall widget
+    // Waterfall widget (same height as spectrum)
     app_data->waterfall = waterfall_widget_new();
-    int waterfall_min_h = (app_data->window_height <= 480) ? 150 : 300;
-    gtk_widget_set_size_request(app_data->waterfall, -1, waterfall_min_h);
+    gtk_widget_set_size_request(app_data->waterfall, -1, display_min_h);
     // Use waterfall-specific adjustments for initial range
     float wf_ref_db = (float)gtk_adjustment_get_value(app_data->waterfall_ref_adj);
     float wf_range_db = (float)gtk_adjustment_get_value(app_data->waterfall_range_adj);
@@ -547,10 +545,12 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_paned_set_resize_end_child(GTK_PANED(paned), TRUE);
     gtk_paned_set_shrink_end_child(GTK_PANED(paned), TRUE);
 
-    // Set paned position
-    // Set paned position (spectrum vs waterfall split)
-    int paned_pos = (app_data->window_height <= 480) ? 180 : 300;
+    // Set paned position (equal split for spectrum and waterfall)
+    int paned_pos = (app_data->window_height - 60) / 2;  // 60 for margins and control bar
     gtk_paned_set_position(GTK_PANED(paned), paned_pos);
+
+    // Add control bar at bottom
+    gtk_box_append(GTK_BOX(vbox), hbox);
 
     // Initialize USB device
     app_data->usb = usb_device_new();
