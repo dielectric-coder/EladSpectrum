@@ -29,6 +29,7 @@ This project provides a spectrum analyzer application for the Elad FDM-DUO Softw
 - Axis labels outside plot area (dB on left, frequency on bottom)
 - Waterfall display with direct pixel rendering and time axis (no scaling artifacts)
 - Adjustable reference level (default -30 dB) and dynamic range (default 120 dB)
+- Red tuned frequency marker line (follows zoom/pan, shows arrow when off-screen)
 
 ### Phase 2: CAT Control (Complete)
 - Frequency and mode display overlay on spectrum (transparent background)
@@ -186,6 +187,9 @@ meson compile -C build
 - **Ref**: Spectrum reference level (top of spectrum display in dB)
 - **Range**: Spectrum dynamic range (dB span from ref to bottom)
 - **Overlay**: Frequency and mode displayed centered on spectrum (cyan text)
+- **Frequency Marker**: Red vertical line at tuned frequency position (from CAT)
+  - Follows zoom and pan movements
+  - Shows red arrow at edge when tuned frequency is panned off-screen
 - **Active Param**: Currently selected parameter for encoder 1 (Pi mode)
 - **Zoom**: Current zoom level shown in cyan (Pi mode with encoder)
 
