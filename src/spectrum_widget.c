@@ -178,15 +178,39 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         cairo_close_path(cr);
         cairo_fill(cr);
 
-        // Draw red center frequency marker line
+        // Draw red center frequency marker line or arrow
         int center_bin = self->spectrum_size / 2;
+        cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);
+
         if (center_bin >= start_bin && center_bin < end_bin) {
+            // Center is visible - draw vertical line
             double marker_x = plot_x + (double)(center_bin - start_bin) / (visible_bins - 1) * plot_width;
-            cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);
             cairo_set_line_width(cr, 2.0);
             cairo_move_to(cr, marker_x, plot_y);
             cairo_line_to(cr, marker_x, plot_y + plot_height);
             cairo_stroke(cr);
+        } else {
+            // Center is off-screen - draw arrow pointing toward it
+            double arrow_size = 12.0;
+            double arrow_y = plot_y + plot_height / 2;
+
+            if (center_bin < start_bin) {
+                // Tuned frequency is to the left - draw left arrow
+                double arrow_x = plot_x + 5;
+                cairo_move_to(cr, arrow_x + arrow_size, arrow_y - arrow_size / 2);
+                cairo_line_to(cr, arrow_x, arrow_y);
+                cairo_line_to(cr, arrow_x + arrow_size, arrow_y + arrow_size / 2);
+                cairo_close_path(cr);
+                cairo_fill(cr);
+            } else {
+                // Tuned frequency is to the right - draw right arrow
+                double arrow_x = plot_x + plot_width - 5;
+                cairo_move_to(cr, arrow_x - arrow_size, arrow_y - arrow_size / 2);
+                cairo_line_to(cr, arrow_x, arrow_y);
+                cairo_line_to(cr, arrow_x - arrow_size, arrow_y + arrow_size / 2);
+                cairo_close_path(cr);
+                cairo_fill(cr);
+            }
         }
     }
 
