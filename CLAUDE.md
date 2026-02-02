@@ -183,8 +183,13 @@ meson compile -C build
 | Option | Description |
 |--------|-------------|
 | `-f, --fullscreen` | Start in fullscreen mode |
-| `-p, --pi` | Set window size to 800x480 (5" LCD), enable rotary encoder |
+| `-p, --pi` | Set window size to 800x480 (5" LCD), enable rotary encoder, use dark theme |
 | `-h, --help` | Show help message |
+
+## Theme
+
+- **Normal mode**: Uses system GTK theme (follows desktop appearance settings)
+- **Pi mode (`-p`)**: Forces dark theme (black background, white/cyan text) for embedded LCD displays
 
 ## UI Controls
 
