@@ -22,6 +22,8 @@ This application provides a spectrum analyzer and waterfall display using the sa
 - Frequency and mode overlay display
 - VFO A/B indicator
 - Adjustable reference level and dynamic range
+- Status indicator (colored circle: green=connected, gray=disconnected)
+- Dual rotary encoder support for Raspberry Pi (optional)
 
 ## Dependencies
 
@@ -41,6 +43,12 @@ On Raspberry Pi OS, you may also need:
 
 ```bash
 sudo apt install libwayland-dev libxkbcommon-dev
+```
+
+For rotary encoder support (optional):
+
+```bash
+sudo apt install libgpiod-dev
 ```
 
 ## Build
@@ -95,7 +103,7 @@ sudo dpkg -i ../elad-spectrum_*.deb
 | Option | Description |
 |--------|-------------|
 | `-f, --fullscreen` | Start in fullscreen mode |
-| `-p, --pi` | Set window size to 800x480 (5" LCD) |
+| `-p, --pi` | Set window size to 800x480 (5" LCD), enable rotary encoder |
 | `-h, --help` | Show help message |
 
 ### Raspberry Pi Usage
@@ -107,6 +115,19 @@ The `-p` and `-f` options are designed for running on a Raspberry Pi with a smal
 ```
 
 This provides a fullscreen interface optimized for the Pi's display size.
+
+## Rotary Encoders (Raspberry Pi)
+
+Optional dual GPIO rotary encoders for hands-free control:
+
+- **Encoder 1**: Parameter control (Ref/Range for spectrum and waterfall)
+  - Button press cycles through parameters
+  - Rotation adjusts current parameter value
+- **Encoder 2**: Zoom/Pan control
+  - Button press toggles zoom/pan mode
+  - Rotation adjusts zoom level (1x/2x/4x) or pans the display
+
+See `CLAUDE.md` for detailed GPIO pin assignments and usage.
 
 ## Hardware Requirements
 

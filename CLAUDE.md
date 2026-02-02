@@ -184,6 +184,10 @@ meson compile -C build
 
 ## UI Controls
 
+- **Status Indicator**: Colored circle showing connection state
+  - Green (●): USB device connected and streaming
+  - Gray (○): Disconnected or not streaming
+  - Red (●): Error state
 - **Spectrum Frame**: Shows current VFO (VFO A or VFO B)
 - **Ref**: Spectrum reference level (top of spectrum display in dB)
 - **Range**: Spectrum dynamic range (dB span from ref to bottom)
@@ -193,6 +197,12 @@ meson compile -C build
   - Shows red arrow at edge when tuned frequency is panned off-screen
 - **Active Param**: Currently selected parameter for encoder 1 (Pi mode)
 - **Zoom**: Current zoom level shown in cyan (Pi mode with encoder)
+
+### Pi Mode UI
+
+In Pi mode (`-p` flag), the control bar uses a single spinbutton that displays the value of the currently active parameter (controlled by encoder 1). This saves horizontal space on small displays. The spinbutton updates automatically when:
+- The active parameter is changed via encoder button press
+- The parameter value is adjusted via encoder rotation
 
 ## Notes
 
