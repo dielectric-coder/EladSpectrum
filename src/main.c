@@ -300,6 +300,7 @@ static void update_param_label(app_data_t *app_data) {
 }
 
 // Update zoom label display (shows span and offset in kHz)
+// Active control (zoom mode = SPAN, pan mode = OFS) highlighted in cyan
 static void update_zoom_label(app_data_t *app_data) {
     if (!app_data->zoom_label) return;
 
@@ -309,10 +310,15 @@ static void update_zoom_label(app_data_t *app_data) {
     // Calculate offset in kHz (pan_offset is in bins)
     int ofs_khz = (int)(app_data->pan_offset * (DEFAULT_SAMPLE_RATE / (float)FFT_SIZE) / 1000);
 
-    char label[64];
+    // Highlight active control: SPAN in zoom mode, OFS in pan mode
+    const char *span_color = (app_data->encoder2_mode == ENCODER2_MODE_ZOOM) ? "cyan" : "white";
+    const char *ofs_color = (app_data->encoder2_mode == ENCODER2_MODE_PAN) ? "cyan" : "white";
+
+    char label[128];
     snprintf(label, sizeof(label),
-             "<span foreground='cyan' weight='bold'>SPAN %d  OFS %+d</span>",
-             span_khz, ofs_khz);
+             "<span foreground='%s' weight='bold'>SPAN %d</span>  "
+             "<span foreground='%s' weight='bold'>OFS %+d</span>",
+             span_color, span_khz, ofs_color, ofs_khz);
     gtk_label_set_markup(GTK_LABEL(app_data->zoom_label), label);
 }
 
