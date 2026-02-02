@@ -448,52 +448,55 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_window_set_title(GTK_WINDOW(app_data->window), "Elad FDM-DUO Spectrum");
     gtk_window_set_default_size(GTK_WINDOW(app_data->window), app_data->window_width, app_data->window_height);
 
-    // Apply CSS styling - cyan background with dark cyan text
-    GtkCssProvider *css_provider = gtk_css_provider_new();
-    const char *css =
-        "window, box, paned, frame, label, button, spinbutton, entry {"
-        "  background-color: #000000;"
-        "  color: #FFFFFF;"
-        "  border: none;"
-        "  outline: none;"
-        "  box-shadow: none;"
-        "}"
-        "spinbutton, spinbutton text, entry, entry text {"
-        "  background-color: #000000;"
-        "  color: #FFFFFF;"
-        "  border: none;"
-        "  outline: none;"
-        "}"
-        "* {"
-        "  outline-width: 0px;"
-        "}"
-        "frame > label {"
-        "  color: #FFFFFF;"
-        "}"
-        "frame > border {"
-        "  border: none;"
-        "}"
-        "paned > separator {"
-        "  background-color: #333333;"
-        "}"
-        ".status-indicator {"
-        "  font-size: 24px;"
-        "}"
-        ".connected {"
-        "  color: #00FF00;"
-        "}"
-        ".disconnected {"
-        "  color: #888888;"
-        "}"
-        ".error {"
-        "  color: #FF0000;"
-        "}";
-    gtk_css_provider_load_from_data(css_provider, css, -1);
-    gtk_style_context_add_provider_for_display(
-        gdk_display_get_default(),
-        GTK_STYLE_PROVIDER(css_provider),
-        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    g_object_unref(css_provider);
+    // Apply CSS styling only in Pi mode (dark theme for embedded display)
+    // Otherwise use system theme
+    if (app_data->pi_mode) {
+        GtkCssProvider *css_provider = gtk_css_provider_new();
+        const char *css =
+            "window, box, paned, frame, label, button, spinbutton, entry {"
+            "  background-color: #000000;"
+            "  color: #FFFFFF;"
+            "  border: none;"
+            "  outline: none;"
+            "  box-shadow: none;"
+            "}"
+            "spinbutton, spinbutton text, entry, entry text {"
+            "  background-color: #000000;"
+            "  color: #FFFFFF;"
+            "  border: none;"
+            "  outline: none;"
+            "}"
+            "* {"
+            "  outline-width: 0px;"
+            "}"
+            "frame > label {"
+            "  color: #FFFFFF;"
+            "}"
+            "frame > border {"
+            "  border: none;"
+            "}"
+            "paned > separator {"
+            "  background-color: #333333;"
+            "}"
+            ".status-indicator {"
+            "  font-size: 24px;"
+            "}"
+            ".connected {"
+            "  color: #00FF00;"
+            "}"
+            ".disconnected {"
+            "  color: #888888;"
+            "}"
+            ".error {"
+            "  color: #FF0000;"
+            "}";
+        gtk_css_provider_load_from_data(css_provider, css, -1);
+        gtk_style_context_add_provider_for_display(
+            gdk_display_get_default(),
+            GTK_STYLE_PROVIDER(css_provider),
+            GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+        g_object_unref(css_provider);
+    }
 
     // Connect close handler
     g_signal_connect(app_data->window, "close-request", G_CALLBACK(on_window_close), app_data);
