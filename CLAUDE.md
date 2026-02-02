@@ -127,11 +127,13 @@ Controls horizontal zoom and panning with mode toggle.
 
 ### Zoom Levels
 
-| Zoom | Frequency Span | Resolution |
-|------|----------------|------------|
-| 1x | 192 kHz (full) | 46.9 Hz/bin |
-| 2x | 96 kHz (center) | 23.4 Hz/bin |
-| 4x | 48 kHz (center) | 11.7 Hz/bin |
+| Zoom | SPAN | Resolution |
+|------|------|------------|
+| 1x | 192 kHz | 46.9 Hz/bin |
+| 2x | 96 kHz | 23.4 Hz/bin |
+| 4x | 48 kHz | 11.7 Hz/bin |
+| 8x | 24 kHz | 5.9 Hz/bin |
+| 16x | 12 kHz | 2.9 Hz/bin |
 
 ### Notes
 
