@@ -391,10 +391,9 @@ static void on_encoder2_rotation(int direction, void *user_data) {
             return;  // No pan at 1x zoom
         }
 
-        // Calculate pan step (number of bins per detent)
+        // Calculate pan step: 10 kHz per detent (in bins)
         int visible_bins = FFT_SIZE / app_data->zoom_level;
-        int pan_step = visible_bins / 16;  // Pan 1/16 of visible area per detent
-        if (pan_step < 1) pan_step = 1;
+        int pan_step = (10000 * FFT_SIZE) / DEFAULT_SAMPLE_RATE;  // 10 kHz = ~213 bins
 
         // Update pan offset (negative direction for intuitive left/right)
         app_data->pan_offset -= direction * pan_step;
