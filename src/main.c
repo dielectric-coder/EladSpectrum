@@ -79,6 +79,9 @@ typedef struct {
     gboolean pi_mode;
     int window_width;
     int window_height;
+
+    // Settings auto-save
+    guint save_timeout_id;
 } app_data_t;
 
 static app_data_t app;
@@ -242,6 +245,44 @@ static gboolean refresh_display(gpointer user_data) {
     return G_SOURCE_CONTINUE;
 }
 
+// Auto-save settings after 3 seconds of no changes
+#define SETTINGS_SAVE_DELAY_MS 3000
+
+static gboolean save_settings_timeout(gpointer user_data) {
+    app_data_t *app_data = (app_data_t *)user_data;
+
+    app_settings_t settings;
+    settings.spectrum_ref = gtk_adjustment_get_value(app_data->ref_adj);
+    settings.spectrum_range = gtk_adjustment_get_value(app_data->range_adj);
+    settings.waterfall_ref = gtk_adjustment_get_value(app_data->waterfall_ref_adj);
+    settings.waterfall_range = gtk_adjustment_get_value(app_data->waterfall_range_adj);
+#ifdef HAVE_GPIOD
+    if (app_data->pi_mode) {
+        settings.zoom_level = app_data->zoom_level;
+        settings.pan_offset = app_data->pan_offset;
+    } else {
+        settings.zoom_level = 1;
+        settings.pan_offset = 0;
+    }
+#else
+    settings.zoom_level = 1;
+    settings.pan_offset = 0;
+#endif
+    settings_save(&settings);
+
+    app_data->save_timeout_id = 0;
+    return G_SOURCE_REMOVE;
+}
+
+static void schedule_settings_save(app_data_t *app_data) {
+    // Cancel any pending save
+    if (app_data->save_timeout_id > 0) {
+        g_source_remove(app_data->save_timeout_id);
+    }
+    // Schedule new save after delay
+    app_data->save_timeout_id = g_timeout_add(SETTINGS_SAVE_DELAY_MS, save_settings_timeout, app_data);
+}
+
 // Spectrum range changed callback
 static void on_spectrum_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
@@ -250,6 +291,7 @@ static void on_spectrum_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer
     float range_db = (float)gtk_adjustment_get_value(app_data->range_adj);
     float min_db = ref_db - range_db;
     spectrum_widget_set_range(SPECTRUM_WIDGET(app_data->spectrum), min_db, ref_db);
+    schedule_settings_save(app_data);
 }
 
 // Waterfall range changed callback
@@ -259,8 +301,8 @@ static void on_waterfall_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointe
     float ref_db = (float)gtk_adjustment_get_value(app_data->waterfall_ref_adj);
     float range_db = (float)gtk_adjustment_get_value(app_data->waterfall_range_adj);
     float min_db = ref_db - range_db;
-
     waterfall_widget_set_range(WATERFALL_WIDGET(app_data->waterfall), min_db, ref_db);
+    schedule_settings_save(app_data);
 }
 
 #ifdef HAVE_GPIOD
@@ -385,6 +427,7 @@ static void on_encoder2_rotation(int direction, void *user_data) {
             waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), 0);
 
             update_zoom_label(app_data);
+            schedule_settings_save(app_data);
         }
     } else {
         // Pan mode: rotation translates horizontally (only when zoom > 1)
@@ -410,6 +453,7 @@ static void on_encoder2_rotation(int direction, void *user_data) {
         waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), app_data->pan_offset);
 
         update_zoom_label(app_data);
+        schedule_settings_save(app_data);
     }
 }
 

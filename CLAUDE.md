@@ -87,10 +87,12 @@ EladSpectrum/
 
 ## Settings Persistence
 
-Display settings are automatically saved on exit and restored on startup.
+Display settings are automatically saved and restored on startup.
 
 - **Config file**: `~/.config/elad-spectrum/settings.conf`
 - **Format**: Simple INI-style key=value (no external library needed)
+- **Auto-save**: Settings are saved 3 seconds after the last change (debounced)
+- **Exit save**: Settings are also saved on normal window close
 
 ### Persisted Settings
 
