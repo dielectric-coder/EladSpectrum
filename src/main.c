@@ -364,11 +364,11 @@ static void on_encoder2_rotation(int direction, void *user_data) {
         int new_zoom = app_data->zoom_level;
 
         if (direction > 0) {
-            // Zoom out: 4 -> 2 -> 1 (SPAN increases)
+            // Zoom out: 16 -> 8 -> 4 -> 2 -> 1 (SPAN increases)
             if (new_zoom > 1) new_zoom /= 2;
         } else {
-            // Zoom in: 1 -> 2 -> 4 (SPAN decreases)
-            if (new_zoom < 4) new_zoom *= 2;
+            // Zoom in: 1 -> 2 -> 4 -> 8 -> 16 (SPAN decreases)
+            if (new_zoom < 16) new_zoom *= 2;
         }
 
         if (new_zoom != app_data->zoom_level) {
