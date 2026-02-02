@@ -245,6 +245,7 @@ static gboolean refresh_display(gpointer user_data) {
 // Spectrum range changed callback
 static void on_spectrum_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
+    if (!app_data->spectrum) return;  // Widget not created yet
     float ref_db = (float)gtk_adjustment_get_value(app_data->ref_adj);
     float range_db = (float)gtk_adjustment_get_value(app_data->range_adj);
     float min_db = ref_db - range_db;
@@ -255,6 +256,7 @@ static void on_spectrum_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer
 // Waterfall range changed callback
 static void on_waterfall_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
+    if (!app_data->waterfall) return;  // Widget not created yet
     float ref_db = (float)gtk_adjustment_get_value(app_data->waterfall_ref_adj);
     float range_db = (float)gtk_adjustment_get_value(app_data->waterfall_range_adj);
     float min_db = ref_db - range_db;
@@ -284,6 +286,7 @@ static GtkAdjustment *get_active_adjustment(app_data_t *app_data) {
 
 // Update parameter label display
 static void update_param_label(app_data_t *app_data) {
+    if (!app_data->param_label) return;
     char label[64];
     snprintf(label, sizeof(label), "<span foreground='cyan' weight='bold'>%s</span>",
              param_names[app_data->active_param]);
@@ -301,6 +304,7 @@ static void update_param_spinbutton(app_data_t *app_data) {
 
 // Update zoom label display (shows mode and zoom level)
 static void update_zoom_label(app_data_t *app_data) {
+    if (!app_data->zoom_label) return;
     char label[64];
     const char *mode_str = (app_data->encoder2_mode == ENCODER2_MODE_ZOOM) ? "Zoom" : "Pan";
     snprintf(label, sizeof(label), "<span foreground='cyan' weight='bold'>%s %dx</span>",
