@@ -246,6 +246,11 @@ static gboolean refresh_display(gpointer user_data) {
 static void on_spectrum_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
     if (!app_data->spectrum) return;  // Widget not created yet
+    if (!app_data->ref_adj || !app_data->range_adj) {
+        fprintf(stderr, "on_spectrum_range_changed: adj NULL ref=%p range=%p\n",
+                (void*)app_data->ref_adj, (void*)app_data->range_adj);
+        return;
+    }
     float ref_db = (float)gtk_adjustment_get_value(app_data->ref_adj);
     float range_db = (float)gtk_adjustment_get_value(app_data->range_adj);
     float min_db = ref_db - range_db;
@@ -351,6 +356,8 @@ static void on_encoder1_button(void *user_data) {
 
     // Cycle through 4 parameters
     app_data->active_param = (app_data->active_param + 1) % PARAM_COUNT;
+    fprintf(stderr, "on_encoder1_button: new param=%d param_spin=%p\n",
+            app_data->active_param, (void*)app_data->param_spin);
 
     update_param_label(app_data);
     update_param_spinbutton(app_data);
