@@ -30,6 +30,9 @@ void usb_device_close(usb_device_t *dev);
 // Check if device is open
 bool usb_device_is_open(usb_device_t *dev);
 
+// Check if device was disconnected (set when transfer errors indicate device loss)
+bool usb_device_check_disconnected(usb_device_t *dev);
+
 // Set the center frequency in Hz
 int usb_device_set_frequency(usb_device_t *dev, long freq_hz);
 

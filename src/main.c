@@ -147,10 +147,20 @@ static void *usb_thread_func(void *user_data) {
     fprintf(stderr, "USB thread started\n");
 
     while (atomic_load(&app_data->running)) {
+        // Check for disconnection (detected via transfer errors)
+        if (usb_device_is_open(app_data->usb) && usb_device_check_disconnected(app_data->usb)) {
+            fprintf(stderr, "USB device disconnected, closing...\n");
+            usb_device_close(app_data->usb);
+            atomic_store(&app_data->usb_connected, 0);
+            usleep(500000);  // Wait 500ms before attempting reconnect
+            continue;
+        }
+
         if (!usb_device_is_open(app_data->usb)) {
             // Try to open device
             if (usb_device_open(app_data->usb) == 0) {
                 atomic_store(&app_data->usb_connected, 1);
+                fprintf(stderr, "USB device connected\n");
 
                 // Read current frequency from radio (don't change it)
                 long freq = usb_device_get_frequency(app_data->usb);
@@ -172,7 +182,7 @@ static void *usb_thread_func(void *user_data) {
             }
         }
 
-        // Handle USB events
+        // Handle USB events (with timeout to allow disconnect check)
         int res = usb_device_handle_events(app_data->usb);
         if (res < 0) {
             fprintf(stderr, "USB error: %d\n", res);

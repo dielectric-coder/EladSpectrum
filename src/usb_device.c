@@ -5,6 +5,7 @@
 #include <string.h>
 #include <math.h>
 #include <unistd.h>
+#include <stdatomic.h>
 
 #define S_RATE 122880000
 #define NUM_TRANSFERS 2
@@ -25,6 +26,9 @@ struct usb_device {
     usb_sample_callback_t callback;
     void *callback_user_data;
     int streaming;
+
+    // Disconnection detection
+    atomic_int disconnected;
 };
 
 static void transfer_callback(struct libusb_transfer *transfer);
@@ -58,6 +62,9 @@ void usb_device_free(usb_device_t *dev) {
 int usb_device_open(usb_device_t *dev) {
     if (!dev || !dev->ctx) return -1;
     if (dev->handle) return 0;  // Already open
+
+    // Reset disconnection flag
+    atomic_store(&dev->disconnected, 0);
 
     unsigned char buffer[64];
     int res;
@@ -164,6 +171,14 @@ void usb_device_close(usb_device_t *dev) {
         libusb_close(dev->handle);
         dev->handle = NULL;
     }
+
+    // Reset disconnection flag
+    atomic_store(&dev->disconnected, 0);
+}
+
+bool usb_device_check_disconnected(usb_device_t *dev) {
+    if (!dev) return true;
+    return atomic_load(&dev->disconnected) != 0;
 }
 
 bool usb_device_is_open(usb_device_t *dev) {
@@ -222,15 +237,27 @@ static void transfer_callback(struct libusb_transfer *transfer) {
         if (dev->callback && dev->streaming) {
             dev->callback(transfer->buffer, transfer->actual_length, dev->callback_user_data);
         }
+    } else if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE ||
+               transfer->status == LIBUSB_TRANSFER_STALL ||
+               transfer->status == LIBUSB_TRANSFER_ERROR) {
+        // Device disconnected or fatal error
+        fprintf(stderr, "USB device disconnected (transfer status: %d)\n", transfer->status);
+        atomic_store(&dev->disconnected, 1);
+        dev->streaming = 0;
+        return;  // Don't resubmit
     } else if (transfer->status != LIBUSB_TRANSFER_CANCELLED) {
         fprintf(stderr, "Transfer error: %d\n", transfer->status);
     }
 
-    // Resubmit transfer if still streaming
-    if (dev->streaming) {
+    // Resubmit transfer if still streaming and not disconnected
+    if (dev->streaming && !atomic_load(&dev->disconnected)) {
         int res = libusb_submit_transfer(transfer);
         if (res != 0) {
             fprintf(stderr, "Failed to resubmit transfer: %s\n", libusb_strerror(res));
+            if (res == LIBUSB_ERROR_NO_DEVICE || res == LIBUSB_ERROR_IO) {
+                atomic_store(&dev->disconnected, 1);
+                dev->streaming = 0;
+            }
         }
     }
 }
@@ -310,7 +337,9 @@ void usb_device_stop_streaming(usb_device_t *dev) {
 
 int usb_device_handle_events(usb_device_t *dev) {
     if (!dev || !dev->ctx) return -1;
-    return libusb_handle_events(dev->ctx);
+    // Use timeout to allow periodic disconnect checks
+    struct timeval tv = { .tv_sec = 0, .tv_usec = 100000 };  // 100ms timeout
+    return libusb_handle_events_timeout(dev->ctx, &tv);
 }
 
 const char *usb_device_get_serial(usb_device_t *dev) {
