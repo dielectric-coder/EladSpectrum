@@ -645,20 +645,66 @@ if (!fft_processor_process(...)) {
 
 ### Reconnection Logic
 
-**Location**: `main.c:109-142`
+**Location**: `main.c:149-197` (USB thread), `usb_device.c` (disconnect detection)
+
+The application handles radio power cycling through a multi-stage process:
+
+#### 1. Disconnect Detection
 
 ```c
-while (running) {
-    if (!usb_device_is_open(usb)) {
-        if (usb_device_open(usb) == 0) {
-            usb_device_start_streaming(usb, callback, data);
-        } else {
-            usleep(1000000);  // Retry after 1 second
-            continue;
-        }
-    }
-    // ... handle events
+// In transfer_callback (usb_device.c)
+if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE ||
+    transfer->status == LIBUSB_TRANSFER_STALL ||
+    transfer->status == LIBUSB_TRANSFER_ERROR) {
+    atomic_store(&dev->disconnected, 1);  // Signal disconnection
 }
+```
+
+#### 2. Cleanup and Context Reinitialization
+
+```c
+// In usb_device_close (usb_device.c)
+if (was_disconnected && dev->ctx) {
+    libusb_exit(dev->ctx);      // Destroy old context
+    libusb_init(&dev->ctx);     // Create fresh context
+}
+```
+
+#### 3. Reconnection with Stabilization Delay
+
+```c
+// In usb_thread_func (main.c)
+if (usb_device_open(app_data->usb) == 0) {
+    usleep(3000000);  // 3 second delay for FPGA initialization
+    cat_control_open(app_data->cat, "/dev/ttyUSB0");  // Reopen CAT
+    usb_device_start_streaming(...);
+}
+```
+
+#### 4. FIFO Reinitialization (Critical)
+
+The FIFO must be reinitialized in `start_streaming()` AFTER the stabilization delay, not during `open()`:
+
+```c
+// In usb_device_start_streaming (usb_device.c)
+// Stop FIFO
+libusb_control_transfer(handle, 0xc0, 0xE1, 0x0000, 0xE9 << 8, ...);
+// Initialize FIFO
+libusb_control_transfer(handle, 0xc0, 0xE1, 0x0000, 0xE8 << 8, ...);
+// Clear endpoint halt
+libusb_clear_halt(handle, ELAD_RF_ENDPOINT);
+// Start FIFO
+libusb_control_transfer(handle, 0xc0, 0xE1, 0x0001, 0xE9 << 8, ...);
+```
+
+**Why this matters**: After a power cycle, the radio's FPGA needs time to initialize. If FIFO commands are sent too early (during `open()`), they appear to succeed but the bulk endpoint won't transfer data. Moving FIFO init to `start_streaming()` ensures it happens after the delay.
+
+#### 5. Transfer Tracking
+
+Pending transfers are tracked with an atomic counter to prevent freeing in-flight transfers:
+
+```c
+atomic_int transfers_pending;  // Incremented on submit, decremented in callback
 ```
 
 ---
@@ -708,3 +754,7 @@ endif
 - [ ] Bandwidth lines appear for all modes
 - [ ] Settings persist across restarts
 - [ ] Rotary encoders respond (Pi mode)
+- [ ] Radio power cycle: status shows disconnected (gray)
+- [ ] Radio power cycle: automatic reconnection after ~5-8 seconds
+- [ ] Radio power cycle: CAT control resumes after reconnection
+- [ ] Radio power cycle: spectrum and waterfall update after reconnection

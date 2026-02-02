@@ -11,7 +11,8 @@ A spectrum analyzer and waterfall display for the Elad FDM-DUO transceiver.
 5. [Understanding the Display](#understanding-the-display)
 6. [Controls](#controls)
 7. [Raspberry Pi Mode](#raspberry-pi-mode)
-8. [Troubleshooting](#troubleshooting)
+8. [Reconnection Behavior](#reconnection-behavior)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -294,6 +295,33 @@ Parameters cycle: SP.REF → SP.RNG → WF.REF → WF.RNG → (repeat)
 | 16x | 12 kHz | 2.9 Hz/bin |
 
 The active mode (SPAN or OFS) is highlighted in cyan.
+
+---
+
+## Reconnection Behavior
+
+The application automatically handles radio power cycling without needing to restart.
+
+### What Happens When You Turn Off the Radio
+
+1. The status indicator changes to gray (○)
+2. The spectrum and waterfall displays freeze
+3. The application begins polling for the device
+
+### What Happens When You Turn On the Radio
+
+1. The application detects the USB device (may take a few seconds)
+2. A 3-second stabilization delay allows the FPGA to initialize
+3. The CAT serial port is reopened
+4. Streaming resumes and displays update
+5. The status indicator returns to green (●)
+
+### Notes
+
+- The entire reconnection process takes approximately 5-8 seconds
+- Your display settings (ref level, range, zoom, pan) are preserved
+- The frequency display may briefly show invalid data during reconnection
+- No manual intervention is required - just wait for the radio to fully boot
 
 ---
 

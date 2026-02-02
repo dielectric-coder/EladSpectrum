@@ -23,6 +23,7 @@ This application provides a spectrum analyzer and waterfall display using the sa
 - VFO A/B indicator
 - Adjustable reference level and dynamic range
 - Status indicator (colored circle: green=connected, gray=disconnected)
+- Automatic reconnection after radio power cycle
 - Dual rotary encoder support for Raspberry Pi (optional)
 
 ## Dependencies
@@ -145,6 +146,7 @@ See `CLAUDE.md` for detailed GPIO pin assignments and usage.
 - USB interfaces may require root access or udev rules for user access
 - Serial port requires `dialout` group membership or root access
 - The FDM-DUO FPGA must be initialized before data streaming begins
+- Application automatically reconnects if the radio is power cycled (3 second stabilization delay)
 
 ## License
 
