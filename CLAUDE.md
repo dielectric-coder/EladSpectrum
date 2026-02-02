@@ -121,7 +121,9 @@ Controls horizontal zoom and panning with mode toggle.
 - **Rotation in Pan mode**: Translates spectrum/waterfall horizontally
   - Clockwise: pan right, Counter-clockwise: pan left
   - Only effective when zoom > 1x
-- **Visual feedback**: Mode and zoom level displayed in cyan ("Zoom 2x" or "Pan 2x")
+- **Visual feedback**: SPAN and OFS displayed in cyan (e.g., "SPAN 96  OFS +10")
+  - SPAN: Visible frequency span in kHz
+  - OFS: Center offset from tuned frequency in kHz (with +/- sign)
 
 ### Zoom Levels
 
@@ -201,12 +203,12 @@ meson compile -C build
 In Pi mode (`-p` flag), the control bar displays all four parameter values in a compact format:
 
 ```
-● SP.REF -30  SP.RNG 120  WF.REF -30  WF.RNG 120  Zoom 1x
+● SP.REF -30  SP.RNG 120  WF.REF -30  WF.RNG 120  SPAN 192  OFS +0
 ```
 
 - **Status indicator**: Connection state (●/○)
 - **Parameter values**: All four shown, active parameter highlighted in cyan
-- **Zoom/Pan indicator**: Current mode and zoom level in cyan
+- **SPAN/OFS indicator**: Visible span and offset in kHz (cyan)
 
 The active parameter (controlled by encoder 1 button) determines which value changes when rotating encoder 1.
 

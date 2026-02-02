@@ -299,13 +299,20 @@ static void update_param_label(app_data_t *app_data) {
     gtk_label_set_markup(GTK_LABEL(app_data->param_label), label);
 }
 
-// Update zoom label display (shows mode and zoom level)
+// Update zoom label display (shows span and offset in kHz)
 static void update_zoom_label(app_data_t *app_data) {
     if (!app_data->zoom_label) return;
+
+    // Calculate span in kHz
+    int span_khz = DEFAULT_SAMPLE_RATE / app_data->zoom_level / 1000;
+
+    // Calculate offset in kHz (pan_offset is in bins)
+    int ofs_khz = (int)(app_data->pan_offset * (DEFAULT_SAMPLE_RATE / (float)FFT_SIZE) / 1000);
+
     char label[64];
-    const char *mode_str = (app_data->encoder2_mode == ENCODER2_MODE_ZOOM) ? "Zoom" : "Pan";
-    snprintf(label, sizeof(label), "<span foreground='cyan' weight='bold'>%s %dx</span>",
-             mode_str, app_data->zoom_level);
+    snprintf(label, sizeof(label),
+             "<span foreground='cyan' weight='bold'>SPAN %d  OFS %+d</span>",
+             span_khz, ofs_khz);
     gtk_label_set_markup(GTK_LABEL(app_data->zoom_label), label);
 }
 
@@ -394,6 +401,8 @@ static void on_encoder2_rotation(int direction, void *user_data) {
         // Apply pan to both widgets
         spectrum_widget_set_pan(SPECTRUM_WIDGET(app_data->spectrum), app_data->pan_offset);
         waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), app_data->pan_offset);
+
+        update_zoom_label(app_data);
     }
 }
 
