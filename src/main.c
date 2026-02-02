@@ -87,15 +87,23 @@ typedef struct {
 static app_data_t app;
 
 // Parse bandwidth string to Hz and center offset
-// Handles formats: "2.4k", "500", "Narrow", "Wide", "D300", "D600", "D1k"
+// Handles formats: "2.4k", "500", "Narrow", "Wide", "D300", "D600", "D1k", "100&1"
 // offset_hz: output for center frequency offset (e.g., +1500 for data modes)
-static int parse_bandwidth_hz(const char *bw_str, int *offset_hz) {
+// is_resonator: output flag for CW resonator modes (100&1, 100&2, etc.)
+static int parse_bandwidth_hz(const char *bw_str, int *offset_hz, int *is_resonator) {
     if (offset_hz) *offset_hz = 0;
+    if (is_resonator) *is_resonator = 0;
     if (!bw_str || bw_str[0] == '\0') return 0;
 
     // Handle special FM bandwidth strings
     if (strcasecmp(bw_str, "Narrow") == 0) return 2500;
     if (strcasecmp(bw_str, "Wide") == 0) return 6000;
+
+    // Handle CW resonator modes: "100&1", "100&2", "100&3", "100&4"
+    if (strncmp(bw_str, "100&", 4) == 0) {
+        if (is_resonator) *is_resonator = 1;
+        return 100;
+    }
 
     // Check for "D" prefix (data mode filters centered at +1500 Hz)
     const char *num_start = bw_str;
@@ -260,9 +268,10 @@ static gboolean refresh_display(gpointer user_data) {
 
                 // Update waterfall bandwidth lines
                 int offset_hz = 0;
-                int bw_hz = parse_bandwidth_hz(app_data->current_filter, &offset_hz);
+                int is_resonator = 0;
+                int bw_hz = parse_bandwidth_hz(app_data->current_filter, &offset_hz, &is_resonator);
                 waterfall_widget_set_bandwidth(WATERFALL_WIDGET(app_data->waterfall),
-                                               bw_hz, app_data->current_mode, offset_hz);
+                                               bw_hz, app_data->current_mode, offset_hz, is_resonator);
             }
         }
     }

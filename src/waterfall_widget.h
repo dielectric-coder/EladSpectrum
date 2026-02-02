@@ -37,7 +37,8 @@ int waterfall_widget_get_pan(WaterfallWidget *widget);
 // bandwidth_hz: filter bandwidth in Hz
 // mode: current operating mode (for asymmetric SSB display)
 // center_offset_hz: offset from tuned frequency (e.g., +1500 for data modes)
-void waterfall_widget_set_bandwidth(WaterfallWidget *widget, int bandwidth_hz, int mode, int center_offset_hz);
+// is_resonator: true for CW resonator modes (draws orange instead of red)
+void waterfall_widget_set_bandwidth(WaterfallWidget *widget, int bandwidth_hz, int mode, int center_offset_hz, int is_resonator);
 
 // Set sample rate (needed for Hz to bin conversion)
 void waterfall_widget_set_sample_rate(WaterfallWidget *widget, int sample_rate);

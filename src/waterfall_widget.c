@@ -33,6 +33,7 @@ struct _WaterfallWidget {
     int current_mode;       // elad_mode_t value
     int sample_rate;        // Sample rate for Hz to bin conversion
     int center_offset_hz;   // Offset from tuned freq (e.g., +1500 for data modes)
+    int is_resonator;       // CW resonator mode (100&1, etc.) - draws orange
 };
 
 G_DEFINE_TYPE(WaterfallWidget, waterfall_widget, GTK_TYPE_DRAWING_AREA)
@@ -135,8 +136,12 @@ static void waterfall_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         center_bin += offset_bins;
         int bw_bins = (self->bandwidth_hz * self->spectrum_size) / self->sample_rate;
 
-        // Set up dashed red line style
-        cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);
+        // Set up dashed line style (orange for resonator, red otherwise)
+        if (self->is_resonator) {
+            cairo_set_source_rgb(cr, 1.0, 0.5, 0.0);  // Orange
+        } else {
+            cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);  // Red
+        }
         cairo_set_line_width(cr, 1.5);
         double dashes[] = {6.0, 4.0};
         cairo_set_dash(cr, dashes, 2, 0);
@@ -281,6 +286,7 @@ static void waterfall_widget_init(WaterfallWidget *self) {
     self->current_mode = ELAD_MODE_UNKNOWN;
     self->sample_rate = DEFAULT_SAMPLE_RATE;
     self->center_offset_hz = 0;
+    self->is_resonator = 0;
 
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(self), waterfall_widget_draw, NULL, NULL);
 }
@@ -412,11 +418,12 @@ int waterfall_widget_get_pan(WaterfallWidget *widget) {
     return widget->pan_offset;
 }
 
-void waterfall_widget_set_bandwidth(WaterfallWidget *widget, int bandwidth_hz, int mode, int center_offset_hz) {
+void waterfall_widget_set_bandwidth(WaterfallWidget *widget, int bandwidth_hz, int mode, int center_offset_hz, int is_resonator) {
     if (!widget) return;
     widget->bandwidth_hz = bandwidth_hz;
     widget->current_mode = mode;
     widget->center_offset_hz = center_offset_hz;
+    widget->is_resonator = is_resonator;
 }
 
 void waterfall_widget_set_sample_rate(WaterfallWidget *widget, int sample_rate) {
