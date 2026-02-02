@@ -6,6 +6,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <stdatomic.h>
+#include <sys/time.h>
 
 #define S_RATE 122880000
 #define NUM_TRANSFERS 2
@@ -233,6 +234,11 @@ int usb_device_set_frequency(usb_device_t *dev, long freq_hz) {
 static void transfer_callback(struct libusb_transfer *transfer) {
     usb_device_t *dev = (usb_device_t *)transfer->user_data;
 
+    // If already marked as disconnected, don't do anything
+    if (atomic_load(&dev->disconnected)) {
+        return;
+    }
+
     if (transfer->status == LIBUSB_TRANSFER_COMPLETED) {
         if (dev->callback && dev->streaming) {
             dev->callback(transfer->buffer, transfer->actual_length, dev->callback_user_data);
@@ -240,12 +246,13 @@ static void transfer_callback(struct libusb_transfer *transfer) {
     } else if (transfer->status == LIBUSB_TRANSFER_NO_DEVICE ||
                transfer->status == LIBUSB_TRANSFER_STALL ||
                transfer->status == LIBUSB_TRANSFER_ERROR) {
-        // Device disconnected or fatal error
+        // Device disconnected or fatal error - just set flag, let main thread cleanup
         fprintf(stderr, "USB device disconnected (transfer status: %d)\n", transfer->status);
         atomic_store(&dev->disconnected, 1);
-        dev->streaming = 0;
         return;  // Don't resubmit
-    } else if (transfer->status != LIBUSB_TRANSFER_CANCELLED) {
+    } else if (transfer->status == LIBUSB_TRANSFER_CANCELLED) {
+        return;  // Don't resubmit cancelled transfers
+    } else {
         fprintf(stderr, "Transfer error: %d\n", transfer->status);
     }
 
@@ -256,7 +263,6 @@ static void transfer_callback(struct libusb_transfer *transfer) {
             fprintf(stderr, "Failed to resubmit transfer: %s\n", libusb_strerror(res));
             if (res == LIBUSB_ERROR_NO_DEVICE || res == LIBUSB_ERROR_IO) {
                 atomic_store(&dev->disconnected, 1);
-                dev->streaming = 0;
             }
         }
     }
@@ -319,10 +325,35 @@ void usb_device_stop_streaming(usb_device_t *dev) {
 
     dev->streaming = 0;
 
-    // Cancel and free transfers
+    // If device was disconnected, transfers are already dead - just free them
+    if (atomic_load(&dev->disconnected)) {
+        for (int i = 0; i < NUM_TRANSFERS; i++) {
+            if (dev->transfers[i]) {
+                libusb_free_transfer(dev->transfers[i]);
+                dev->transfers[i] = NULL;
+            }
+        }
+        return;
+    }
+
+    // Cancel transfers and wait for completion
     for (int i = 0; i < NUM_TRANSFERS; i++) {
         if (dev->transfers[i]) {
             libusb_cancel_transfer(dev->transfers[i]);
+        }
+    }
+
+    // Wait for cancellations to complete (callbacks will be called)
+    if (dev->handle && dev->ctx) {
+        struct timeval tv = { .tv_sec = 0, .tv_usec = 100000 };  // 100ms
+        for (int i = 0; i < 10; i++) {  // Max 1 second wait
+            libusb_handle_events_timeout(dev->ctx, &tv);
+        }
+    }
+
+    // Now free transfers
+    for (int i = 0; i < NUM_TRANSFERS; i++) {
+        if (dev->transfers[i]) {
             libusb_free_transfer(dev->transfers[i]);
             dev->transfers[i] = NULL;
         }
