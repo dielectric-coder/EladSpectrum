@@ -50,9 +50,8 @@ typedef struct {
 #ifdef HAVE_GPIOD
     rotary_encoder_t *encoder1;       // Parameter control encoder
     rotary_encoder_t *encoder2;       // Zoom/pan control encoder
-    GtkWidget *param_label;           // Shows active parameter
+    GtkWidget *param_label;           // Shows all parameter values
     GtkWidget *zoom_label;            // Shows zoom level and mode
-    GtkWidget *param_spin;            // Single spinbutton (Pi mode only)
     active_param_t active_param;      // Current parameter selection
     encoder2_mode_t encoder2_mode;    // Zoom or pan mode
     int zoom_level;                   // 1, 2, 4
@@ -283,23 +282,29 @@ static GtkAdjustment *get_active_adjustment(app_data_t *app_data) {
     }
 }
 
-// Update parameter label display
+// Update parameter label display - shows all four values with active highlighted
 static void update_param_label(app_data_t *app_data) {
     if (!app_data->param_label) return;
-    char label[64];
-    snprintf(label, sizeof(label), "<span foreground='cyan' weight='bold'>%s</span>",
-             param_names[app_data->active_param]);
-    gtk_label_set_markup(GTK_LABEL(app_data->param_label), label);
-}
 
-// Update spinbutton to show current parameter's value
-static void update_param_spinbutton(app_data_t *app_data) {
-    if (!app_data->param_spin) return;
-    GtkAdjustment *adj = get_active_adjustment(app_data);
-    if (!adj) return;
-    // Just update the displayed value, don't switch adjustments
-    double value = gtk_adjustment_get_value(adj);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(app_data->param_spin), value);
+    // Get current values from all adjustments
+    int sp_ref = (int)gtk_adjustment_get_value(app_data->ref_adj);
+    int sp_rng = (int)gtk_adjustment_get_value(app_data->range_adj);
+    int wf_ref = (int)gtk_adjustment_get_value(app_data->waterfall_ref_adj);
+    int wf_rng = (int)gtk_adjustment_get_value(app_data->waterfall_range_adj);
+
+    // Build markup string with active parameter in cyan, others in white
+    char label[256];
+    snprintf(label, sizeof(label),
+             "<span foreground='%s' weight='bold'>SP.REF %d</span>  "
+             "<span foreground='%s' weight='bold'>SP.RNG %d</span>  "
+             "<span foreground='%s' weight='bold'>WF.REF %d</span>  "
+             "<span foreground='%s' weight='bold'>WF.RNG %d</span>",
+             app_data->active_param == PARAM_SPECTRUM_REF ? "cyan" : "white", sp_ref,
+             app_data->active_param == PARAM_SPECTRUM_RANGE ? "cyan" : "white", sp_rng,
+             app_data->active_param == PARAM_WATERFALL_REF ? "cyan" : "white", wf_ref,
+             app_data->active_param == PARAM_WATERFALL_RANGE ? "cyan" : "white", wf_rng);
+
+    gtk_label_set_markup(GTK_LABEL(app_data->param_label), label);
 }
 
 // Update zoom label display (shows mode and zoom level)
@@ -332,7 +337,7 @@ static void on_encoder1_rotation(int direction, void *user_data) {
     if (new_value > upper) new_value = upper;
 
     gtk_adjustment_set_value(adj, new_value);
-    update_param_spinbutton(app_data);
+    update_param_label(app_data);
 }
 
 // Encoder 1 button callback - cycles through parameters
@@ -343,7 +348,6 @@ static void on_encoder1_button(void *user_data) {
     app_data->active_param = (app_data->active_param + 1) % PARAM_COUNT;
 
     update_param_label(app_data);
-    update_param_spinbutton(app_data);
 }
 
 // Encoder 2 rotation callback - zooms or pans based on mode
@@ -520,11 +524,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
 
 #ifdef HAVE_GPIOD
     if (app_data->pi_mode) {
-        // Pi mode: single spinbutton with wide range to show any parameter
-        GtkAdjustment *spin_adj = gtk_adjustment_new(-30.0, -80.0, 150.0, 1.0, 5.0, 0.0);
-        app_data->param_spin = gtk_spin_button_new(spin_adj, 1.0, 0);
-        gtk_box_append(GTK_BOX(hbox), app_data->param_spin);
-
+        // Pi mode: read-only label showing all parameter values
         app_data->param_label = gtk_label_new(NULL);
         gtk_box_append(GTK_BOX(hbox), app_data->param_label);
 
