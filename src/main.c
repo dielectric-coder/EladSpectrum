@@ -159,6 +159,8 @@ static void *usb_thread_func(void *user_data) {
             fprintf(stderr, "USB device disconnected, closing...\n");
             usb_device_close(app_data->usb);
             atomic_store(&app_data->usb_connected, 0);
+            // Also close CAT - serial port will be invalid
+            cat_control_close(app_data->cat);
             usleep(500000);  // Wait 500ms before attempting reconnect
             continue;
         }
@@ -166,11 +168,18 @@ static void *usb_thread_func(void *user_data) {
         if (!usb_device_is_open(app_data->usb)) {
             // Try to open device
             if (usb_device_open(app_data->usb) == 0) {
-                // Give device time to stabilize after connection
-                usleep(100000);  // 100ms
+                // Give device time to fully initialize after power-on
+                // The FPGA and USB controller need time to stabilize
+                fprintf(stderr, "Waiting for device to stabilize...\n");
+                usleep(2000000);  // 2 seconds
 
                 atomic_store(&app_data->usb_connected, 1);
                 fprintf(stderr, "USB device connected\n");
+
+                // Try to reopen CAT serial port (it may have been recreated)
+                if (!cat_control_is_open(app_data->cat)) {
+                    cat_control_open(app_data->cat, "/dev/ttyUSB0");
+                }
 
                 // Read current frequency from radio (don't change it)
                 long freq = usb_device_get_frequency(app_data->usb);
