@@ -255,6 +255,44 @@ In Pi mode (`-p` flag), the control bar displays all four parameter values in a 
 
 The active parameter (controlled by encoder 1 button) determines which value changes when rotating encoder 1.
 
+## USB Reconnection Behavior
+
+The application automatically handles radio power cycling and USB disconnection/reconnection.
+
+### Disconnection Detection
+
+- USB bulk transfer errors (NO_DEVICE, STALL, ERROR) trigger disconnection detection
+- Transfer callbacks track pending operations to ensure safe cleanup
+- Status indicator changes to gray (○) when disconnected
+
+### Reconnection Sequence
+
+When the radio is powered back on:
+
+1. **Device Detection**: USB thread polls for device every 1 second
+2. **Device Open**: Once detected, the device is opened and interface claimed
+3. **Stabilization Delay**: 3 second wait for FPGA initialization
+4. **Context Reinitialization**: libusb context is recreated for clean state
+5. **CAT Reconnection**: Serial port (/dev/ttyUSB0) is reopened
+6. **FIFO Initialization**: FPGA FIFO is stopped, initialized, and restarted
+7. **Streaming Resumes**: Bulk transfers are resubmitted
+
+### Technical Details
+
+- The FIFO must be re-initialized in `start_streaming()` after the stabilization delay, not during `usb_device_open()`, because the FPGA needs time to initialize after power-on
+- The libusb context is destroyed and recreated after disconnection to ensure no stale state
+- CAT serial port is closed on disconnect and reopened on reconnect (the /dev/ttyUSB0 device is recreated by the kernel)
+- Pending transfer count is tracked atomically to prevent freeing transfers while callbacks are in progress
+
+### Status Indicator States
+
+| State | Indicator | Meaning |
+|-------|-----------|---------|
+| Connected | Green ● | USB device streaming normally |
+| Disconnected | Gray ○ | Device not found or powered off |
+| Reconnecting | Gray ○ | Waiting for device to reappear |
+| Error | Red ● | Initialization or fatal error |
+
 ## Notes
 
 - USB interfaces may require root access or udev rules for user access
