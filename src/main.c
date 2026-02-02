@@ -12,6 +12,7 @@
 #include "spectrum_widget.h"
 #include "waterfall_widget.h"
 #include "cat_control.h"
+#include "settings.h"
 #ifdef HAVE_GPIOD
 #include "rotary_encoder.h"
 #endif
@@ -431,6 +432,26 @@ static void on_encoder2_button(void *user_data) {
 static gboolean on_window_close(GtkWindow *window G_GNUC_UNUSED, gpointer user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
 
+    // Save settings before closing
+    app_settings_t settings;
+    settings.spectrum_ref = gtk_adjustment_get_value(app_data->ref_adj);
+    settings.spectrum_range = gtk_adjustment_get_value(app_data->range_adj);
+    settings.waterfall_ref = gtk_adjustment_get_value(app_data->waterfall_ref_adj);
+    settings.waterfall_range = gtk_adjustment_get_value(app_data->waterfall_range_adj);
+#ifdef HAVE_GPIOD
+    if (app_data->pi_mode) {
+        settings.zoom_level = app_data->zoom_level;
+        settings.pan_offset = app_data->pan_offset;
+    } else {
+        settings.zoom_level = 1;
+        settings.pan_offset = 0;
+    }
+#else
+    settings.zoom_level = 1;
+    settings.pan_offset = 0;
+#endif
+    settings_save(&settings);
+
     // Signal USB thread to stop
     atomic_store(&app_data->running, 0);
 
@@ -519,17 +540,21 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     gtk_widget_add_css_class(GTK_WIDGET(app_data->status_icon), "disconnected");
     gtk_box_append(GTK_BOX(hbox), app_data->status_icon);
 
-    // Create all adjustments first
-    app_data->ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
+    // Load saved settings
+    app_settings_t settings;
+    settings_load(&settings);
+
+    // Create all adjustments with loaded values
+    app_data->ref_adj = gtk_adjustment_new(settings.spectrum_ref, -80.0, 20.0, 5.0, 10.0, 0.0);
     g_signal_connect(app_data->ref_adj, "value-changed", G_CALLBACK(on_spectrum_range_changed), app_data);
 
-    app_data->range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
+    app_data->range_adj = gtk_adjustment_new(settings.spectrum_range, 20.0, 150.0, 10.0, 20.0, 0.0);
     g_signal_connect(app_data->range_adj, "value-changed", G_CALLBACK(on_spectrum_range_changed), app_data);
 
-    app_data->waterfall_ref_adj = gtk_adjustment_new(-30.0, -80.0, 20.0, 5.0, 10.0, 0.0);
+    app_data->waterfall_ref_adj = gtk_adjustment_new(settings.waterfall_ref, -80.0, 20.0, 5.0, 10.0, 0.0);
     g_signal_connect(app_data->waterfall_ref_adj, "value-changed", G_CALLBACK(on_waterfall_range_changed), app_data);
 
-    app_data->waterfall_range_adj = gtk_adjustment_new(120.0, 20.0, 150.0, 10.0, 20.0, 0.0);
+    app_data->waterfall_range_adj = gtk_adjustment_new(settings.waterfall_range, 20.0, 150.0, 10.0, 20.0, 0.0);
     g_signal_connect(app_data->waterfall_range_adj, "value-changed", G_CALLBACK(on_waterfall_range_changed), app_data);
 
 #ifdef HAVE_GPIOD
@@ -633,10 +658,16 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
 #ifdef HAVE_GPIOD
     // Initialize rotary encoders (Pi mode only)
     if (app_data->pi_mode) {
-        app_data->zoom_level = 1;
-        app_data->pan_offset = 0;
+        app_data->zoom_level = settings.zoom_level;
+        app_data->pan_offset = settings.pan_offset;
         app_data->active_param = PARAM_SPECTRUM_REF;
         app_data->encoder2_mode = ENCODER2_MODE_ZOOM;
+
+        // Apply saved zoom/pan to widgets
+        spectrum_widget_set_zoom(SPECTRUM_WIDGET(app_data->spectrum), app_data->zoom_level);
+        spectrum_widget_set_pan(SPECTRUM_WIDGET(app_data->spectrum), app_data->pan_offset);
+        waterfall_widget_set_zoom(WATERFALL_WIDGET(app_data->waterfall), app_data->zoom_level);
+        waterfall_widget_set_pan(WATERFALL_WIDGET(app_data->waterfall), app_data->pan_offset);
 
         // Encoder 1 - Parameter control (GPIO 17/27/22)
         app_data->encoder1 = rotary_encoder_new_with_pins(

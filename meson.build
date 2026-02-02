@@ -17,6 +17,7 @@ src_files = [
   'src/spectrum_widget.c',
   'src/waterfall_widget.c',
   'src/cat_control.c',
+  'src/settings.c',
 ]
 
 # Rotary encoder support (optional, requires libgpiod)

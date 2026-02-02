@@ -59,7 +59,8 @@ EladSpectrum/
 │   ├── fft_processor.c/h    # FFT computation with FFTW3
 │   ├── spectrum_widget.c/h  # Spectrum display GtkDrawingArea
 │   ├── waterfall_widget.c/h # Waterfall display GtkDrawingArea
-│   └── rotary_encoder.c/h   # GPIO rotary encoder (Pi only, optional)
+│   ├── rotary_encoder.c/h   # GPIO rotary encoder (Pi only, optional)
+│   └── settings.c/h         # Settings persistence (load/save to config file)
 └── examples/                # Reference implementations
     ├── main.c               # Direct USB communication example
     ├── elad-server.c        # Network server with UDP/TCP
@@ -83,6 +84,24 @@ EladSpectrum/
 - **Frequency Resolution**: 46.9 Hz per bin (at 192 kHz sample rate)
 - **Averaging**: 3 frames
 - **Update Rate**: ~15.6 lines/second (192000 / 4096 / 3)
+
+## Settings Persistence
+
+Display settings are automatically saved on exit and restored on startup.
+
+- **Config file**: `~/.config/elad-spectrum/settings.conf`
+- **Format**: Simple INI-style key=value (no external library needed)
+
+### Persisted Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| spectrum_ref | Spectrum reference level (dB) | -30.0 |
+| spectrum_range | Spectrum dynamic range (dB) | 120.0 |
+| waterfall_ref | Waterfall reference level (dB) | -30.0 |
+| waterfall_range | Waterfall dynamic range (dB) | 120.0 |
+| zoom_level | Zoom level (1, 2, 4, 8, 16) | 1 |
+| pan_offset | Pan offset in FFT bins | 0 |
 
 ## Dual Rotary Encoders (Raspberry Pi)
 
