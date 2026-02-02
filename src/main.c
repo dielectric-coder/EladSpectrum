@@ -297,9 +297,10 @@ static void update_param_label(app_data_t *app_data) {
 static void update_param_spinbutton(app_data_t *app_data) {
     if (!app_data->param_spin) return;
     GtkAdjustment *adj = get_active_adjustment(app_data);
+    if (!adj) return;
+    double value = gtk_adjustment_get_value(adj);
     gtk_spin_button_set_adjustment(GTK_SPIN_BUTTON(app_data->param_spin), adj);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(app_data->param_spin),
-                              gtk_adjustment_get_value(adj));
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(app_data->param_spin), value);
 }
 
 // Update zoom label display (shows mode and zoom level)
@@ -316,29 +317,11 @@ static void update_zoom_label(app_data_t *app_data) {
 static void on_encoder1_rotation(int direction, void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
 
-    GtkAdjustment *adj = NULL;
-    double step = 1.0;  // Default 1 dB per detent for ref levels
+    GtkAdjustment *adj = get_active_adjustment(app_data);
+    if (!adj) return;
 
-    switch (app_data->active_param) {
-        case PARAM_SPECTRUM_REF:
-            adj = app_data->ref_adj;
-            step = 1.0;
-            break;
-        case PARAM_SPECTRUM_RANGE:
-            adj = app_data->range_adj;
-            step = 5.0;  // 5 dB per detent for range
-            break;
-        case PARAM_WATERFALL_REF:
-            adj = app_data->waterfall_ref_adj;
-            step = 1.0;
-            break;
-        case PARAM_WATERFALL_RANGE:
-            adj = app_data->waterfall_range_adj;
-            step = 5.0;  // 5 dB per detent for range
-            break;
-        default:
-            return;
-    }
+    double step = (app_data->active_param == PARAM_SPECTRUM_RANGE ||
+                   app_data->active_param == PARAM_WATERFALL_RANGE) ? 5.0 : 1.0;
 
     double value = gtk_adjustment_get_value(adj);
     double new_value = value + (direction * step);
