@@ -80,15 +80,6 @@ int usb_device_open(usb_device_t *dev) {
     }
     fprintf(stderr, "FDM-DUO device opened\n");
 
-    // Reset device to ensure clean state (especially after reconnection)
-    res = libusb_reset_device(dev->handle);
-    if (res < 0) {
-        fprintf(stderr, "Warning: Device reset failed: %s\n", libusb_strerror(res));
-        // Continue anyway - reset might not be needed
-    } else {
-        fprintf(stderr, "Device reset OK\n");
-    }
-
     // Detach kernel driver if active
     if (libusb_kernel_driver_active(dev->handle, 0) == 1) {
         fprintf(stderr, "Kernel driver active, detaching...\n");
