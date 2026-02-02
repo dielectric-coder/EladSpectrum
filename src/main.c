@@ -323,13 +323,20 @@ static void update_zoom_label(app_data_t *app_data) {
     gtk_label_set_markup(GTK_LABEL(app_data->zoom_label), label);
 }
 
+// Guard against re-entrant encoder calls
+static gboolean encoder1_busy = FALSE;
+
 // Encoder 1 rotation callback - adjusts active parameter
 static void on_encoder1_rotation(int direction, void *user_data) {
+    if (encoder1_busy) return;
+    encoder1_busy = TRUE;
+
     app_data_t *app_data = (app_data_t *)user_data;
 
     GtkAdjustment *adj = get_active_adjustment(app_data);
     if (!adj) {
         fprintf(stderr, "on_encoder1_rotation: adj is NULL\n");
+        encoder1_busy = FALSE;
         return;
     }
 
@@ -348,6 +355,7 @@ static void on_encoder1_rotation(int direction, void *user_data) {
     if (new_value > upper) new_value = upper;
 
     gtk_adjustment_set_value(adj, new_value);
+    encoder1_busy = FALSE;
 }
 
 // Encoder 1 button callback - cycles through parameters
