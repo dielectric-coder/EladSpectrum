@@ -166,14 +166,19 @@ static void *usb_thread_func(void *user_data) {
         if (!usb_device_is_open(app_data->usb)) {
             // Try to open device
             if (usb_device_open(app_data->usb) == 0) {
+                // Give device time to stabilize after connection
+                usleep(100000);  // 100ms
+
                 atomic_store(&app_data->usb_connected, 1);
                 fprintf(stderr, "USB device connected\n");
 
                 // Read current frequency from radio (don't change it)
                 long freq = usb_device_get_frequency(app_data->usb);
-                if (freq > 0) {
+                if (freq > 0 && freq < 100000000) {  // Sanity check: < 100 MHz
                     app_data->center_freq_hz = (int)freq;
                     fprintf(stderr, "Radio frequency: %ld Hz\n", freq);
+                } else {
+                    fprintf(stderr, "Radio frequency invalid: %ld Hz (using previous)\n", freq);
                 }
 
                 // Start streaming
