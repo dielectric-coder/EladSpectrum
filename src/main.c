@@ -245,16 +245,10 @@ static gboolean refresh_display(gpointer user_data) {
 // Spectrum range changed callback
 static void on_spectrum_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointer user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
-    if (!app_data->spectrum) return;  // Widget not created yet
-    if (!app_data->ref_adj || !app_data->range_adj) {
-        fprintf(stderr, "on_spectrum_range_changed: adj NULL ref=%p range=%p\n",
-                (void*)app_data->ref_adj, (void*)app_data->range_adj);
-        return;
-    }
+    if (!app_data->spectrum || !app_data->ref_adj || !app_data->range_adj) return;
     float ref_db = (float)gtk_adjustment_get_value(app_data->ref_adj);
     float range_db = (float)gtk_adjustment_get_value(app_data->range_adj);
     float min_db = ref_db - range_db;
-
     spectrum_widget_set_range(SPECTRUM_WIDGET(app_data->spectrum), min_db, ref_db);
 }
 
@@ -318,22 +312,12 @@ static void update_zoom_label(app_data_t *app_data) {
     gtk_label_set_markup(GTK_LABEL(app_data->zoom_label), label);
 }
 
-// Guard against re-entrant encoder calls
-static gboolean encoder1_busy = FALSE;
-
 // Encoder 1 rotation callback - adjusts active parameter
 static void on_encoder1_rotation(int direction, void *user_data) {
-    if (encoder1_busy) return;
-    encoder1_busy = TRUE;
-
     app_data_t *app_data = (app_data_t *)user_data;
 
     GtkAdjustment *adj = get_active_adjustment(app_data);
-    if (!adj) {
-        fprintf(stderr, "on_encoder1_rotation: adj is NULL\n");
-        encoder1_busy = FALSE;
-        return;
-    }
+    if (!adj) return;
 
     double step = (app_data->active_param == PARAM_SPECTRUM_RANGE ||
                    app_data->active_param == PARAM_WATERFALL_RANGE) ? 5.0 : 1.0;
@@ -344,13 +328,11 @@ static void on_encoder1_rotation(int direction, void *user_data) {
     // Clamp to adjustment bounds
     double lower = gtk_adjustment_get_lower(adj);
     double upper = gtk_adjustment_get_upper(adj);
-    fprintf(stderr, "on_encoder1_rotation: param=%d value=%.1f new=%.1f bounds=[%.1f,%.1f]\n",
-            app_data->active_param, value, new_value, lower, upper);
     if (new_value < lower) new_value = lower;
     if (new_value > upper) new_value = upper;
 
     gtk_adjustment_set_value(adj, new_value);
-    encoder1_busy = FALSE;
+    update_param_spinbutton(app_data);
 }
 
 // Encoder 1 button callback - cycles through parameters
@@ -359,8 +341,6 @@ static void on_encoder1_button(void *user_data) {
 
     // Cycle through 4 parameters
     app_data->active_param = (app_data->active_param + 1) % PARAM_COUNT;
-    fprintf(stderr, "on_encoder1_button: new param=%d param_spin=%p\n",
-            app_data->active_param, (void*)app_data->param_spin);
 
     update_param_label(app_data);
     update_param_spinbutton(app_data);
