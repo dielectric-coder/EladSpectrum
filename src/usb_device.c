@@ -181,13 +181,30 @@ void usb_device_close(usb_device_t *dev) {
         dev->transfer_buffers[i] = NULL;
     }
 
+    // Check if we need to reinit context (after disconnection)
+    int was_disconnected = atomic_load(&dev->disconnected);
+
     if (dev->handle) {
         // Only release interface if device is still connected
-        if (!atomic_load(&dev->disconnected)) {
+        if (!was_disconnected) {
             libusb_release_interface(dev->handle, 0);
         }
         libusb_close(dev->handle);
         dev->handle = NULL;
+    }
+
+    // If device was disconnected, reinitialize libusb context
+    // This ensures clean state for reconnection
+    if (was_disconnected && dev->ctx) {
+        fprintf(stderr, "Reinitializing libusb context...\n");
+        libusb_exit(dev->ctx);
+        dev->ctx = NULL;
+        int res = libusb_init(&dev->ctx);
+        if (res < 0) {
+            fprintf(stderr, "libusb_init failed: %s\n", libusb_strerror(res));
+        } else {
+            fprintf(stderr, "libusb context reinitialized\n");
+        }
     }
 
     // Reset disconnection flag and pending count
