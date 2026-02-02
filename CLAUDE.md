@@ -28,6 +28,7 @@ This project provides a spectrum analyzer application for the Elad FDM-DUO Softw
 - Live spectrum analyzer with cyan trace and grid
 - Axis labels outside plot area (dB on left, frequency on bottom)
 - Waterfall display with direct pixel rendering and time axis (no scaling artifacts)
+- Local and UTC time display overlay on waterfall (top-left and top-right, cyan)
 - Adjustable reference level (default -30 dB) and dynamic range (default 120 dB)
 - Red tuned frequency marker line (follows zoom/pan, shows arrow when off-screen)
 
@@ -205,6 +206,9 @@ meson compile -C build
 - **Frequency Marker**: Red vertical line at tuned frequency position (from CAT)
   - Follows zoom and pan movements
   - Shows red arrow at edge when tuned frequency is panned off-screen
+- **Time Display**: Local and UTC time shown at top of waterfall
+  - LOCAL HH:MM:SS at top-left
+  - UTC HH:MM:SS at top-right
 
 ### Pi Mode UI
 
