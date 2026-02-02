@@ -115,8 +115,8 @@ Controls horizontal zoom and panning with mode toggle.
 
 - **Button press**: Toggles between Zoom mode and Pan mode
 - **Rotation in Zoom mode**: Changes zoom level
-  - Clockwise: zoom in (1x → 2x → 4x)
-  - Counter-clockwise: zoom out (4x → 2x → 1x)
+  - Clockwise: zoom in (1x → 2x → 4x → 8x → 16x)
+  - Counter-clockwise: zoom out (16x → 8x → 4x → 2x → 1x)
   - Pan resets to center when zoom changes
 - **Rotation in Pan mode**: Translates spectrum/waterfall horizontally
   - Clockwise: pan right, Counter-clockwise: pan left
@@ -128,13 +128,13 @@ Controls horizontal zoom and panning with mode toggle.
 
 ### Zoom Levels
 
-| Zoom | SPAN | Resolution |
-|------|------|------------|
-| 1x | 192 kHz | 46.9 Hz/bin |
-| 2x | 96 kHz | 23.4 Hz/bin |
-| 4x | 48 kHz | 11.7 Hz/bin |
-| 8x | 24 kHz | 5.9 Hz/bin |
-| 16x | 12 kHz | 2.9 Hz/bin |
+| Zoom | SPAN | Resolution | OFS Step |
+|------|------|------------|----------|
+| 1x | 192 kHz | 46.9 Hz/bin | 19.2 kHz |
+| 2x | 96 kHz | 23.4 Hz/bin | 9.6 kHz |
+| 4x | 48 kHz | 11.7 Hz/bin | 4.8 kHz |
+| 8x | 24 kHz | 5.9 Hz/bin | 2.4 kHz |
+| 16x | 12 kHz | 2.9 Hz/bin | 1.2 kHz |
 
 ### Notes
 
