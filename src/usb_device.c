@@ -135,13 +135,17 @@ int usb_device_open(usb_device_t *dev) {
     // Stop FIFO
     res = libusb_control_transfer(dev->handle, 0xc0, 0xE1, 0x0000, 0xE9 << 8, buffer, 1, 1000);
     if (res != 1) {
-        fprintf(stderr, "Warning: Stop FIFO failed\n");
+        fprintf(stderr, "Warning: Stop FIFO failed: res=%d\n", res);
+    } else {
+        fprintf(stderr, "FIFO stopped\n");
     }
 
     // Initialize FIFO (set EP6 FIFO to slave mode)
     res = libusb_control_transfer(dev->handle, 0xc0, 0xE1, 0x0000, 0xE8 << 8, buffer, 1, 1000);
     if (res != 1) {
-        fprintf(stderr, "Warning: Init FIFO failed\n");
+        fprintf(stderr, "Warning: Init FIFO failed: res=%d\n", res);
+    } else {
+        fprintf(stderr, "FIFO initialized\n");
     }
 
     // Read sample rate correction
@@ -304,6 +308,14 @@ int usb_device_start_streaming(usb_device_t *dev, usb_sample_callback_t callback
 
     dev->callback = callback;
     dev->callback_user_data = user_data;
+
+    // Clear any stalled state on the bulk endpoint
+    res = libusb_clear_halt(dev->handle, ELAD_RF_ENDPOINT);
+    if (res < 0 && res != LIBUSB_ERROR_NOT_FOUND) {
+        fprintf(stderr, "Warning: Clear halt failed: %s\n", libusb_strerror(res));
+    } else {
+        fprintf(stderr, "Endpoint cleared\n");
+    }
 
     // Start FIFO
     res = libusb_control_transfer(dev->handle, 0xc0, 0xE1, 0x0001, 0x0E9 << 8, buffer, 1, 1000);
