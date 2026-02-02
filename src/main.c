@@ -593,7 +593,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     float wf_range_db = (float)gtk_adjustment_get_value(app_data->waterfall_range_adj);
     waterfall_widget_set_range(WATERFALL_WIDGET(app_data->waterfall), wf_ref_db - wf_range_db, wf_ref_db);
 
-    GtkWidget *waterfall_frame = gtk_frame_new("Waterfall");
+    GtkWidget *waterfall_frame = gtk_frame_new(NULL);
     gtk_frame_set_child(GTK_FRAME(waterfall_frame), app_data->waterfall);
     gtk_paned_set_end_child(GTK_PANED(paned), waterfall_frame);
     gtk_paned_set_resize_end_child(GTK_PANED(paned), TRUE);
