@@ -170,8 +170,8 @@ static void *usb_thread_func(void *user_data) {
             if (usb_device_open(app_data->usb) == 0) {
                 // Give device time to fully initialize after power-on
                 // The FPGA and USB controller need time to stabilize
-                fprintf(stderr, "Waiting for device to stabilize (10s)...\n");
-                usleep(10000000);  // 10 seconds
+                fprintf(stderr, "Waiting for device to stabilize (3s)...\n");
+                usleep(3000000);  // 3 seconds
 
                 atomic_store(&app_data->usb_connected, 1);
                 fprintf(stderr, "USB device connected\n");

@@ -317,6 +317,19 @@ int usb_device_start_streaming(usb_device_t *dev, usb_sample_callback_t callback
     dev->callback = callback;
     dev->callback_user_data = user_data;
 
+    // Re-initialize FIFO (in case device was power cycled)
+    // Stop FIFO first
+    res = libusb_control_transfer(dev->handle, 0xc0, 0xE1, 0x0000, 0xE9 << 8, buffer, 1, 1000);
+    if (res != 1) {
+        fprintf(stderr, "Warning: Stop FIFO failed in start_streaming\n");
+    }
+
+    // Initialize FIFO (set EP6 FIFO to slave mode)
+    res = libusb_control_transfer(dev->handle, 0xc0, 0xE1, 0x0000, 0xE8 << 8, buffer, 1, 1000);
+    if (res != 1) {
+        fprintf(stderr, "Warning: Init FIFO failed in start_streaming\n");
+    }
+
     // Clear any stalled state on the bulk endpoint
     res = libusb_clear_halt(dev->handle, ELAD_RF_ENDPOINT);
     if (res < 0 && res != LIBUSB_ERROR_NOT_FOUND) {
