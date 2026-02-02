@@ -297,8 +297,13 @@ static void update_param_label(app_data_t *app_data) {
 static void update_param_spinbutton(app_data_t *app_data) {
     if (!app_data->param_spin) return;
     GtkAdjustment *adj = get_active_adjustment(app_data);
-    if (!adj) return;
+    if (!adj) {
+        fprintf(stderr, "update_param_spinbutton: adj is NULL for param %d\n", app_data->active_param);
+        return;
+    }
     double value = gtk_adjustment_get_value(adj);
+    fprintf(stderr, "update_param_spinbutton: param=%d adj=%p value=%.1f\n",
+            app_data->active_param, (void*)adj, value);
     gtk_spin_button_set_adjustment(GTK_SPIN_BUTTON(app_data->param_spin), adj);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(app_data->param_spin), value);
 }
@@ -318,7 +323,10 @@ static void on_encoder1_rotation(int direction, void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
 
     GtkAdjustment *adj = get_active_adjustment(app_data);
-    if (!adj) return;
+    if (!adj) {
+        fprintf(stderr, "on_encoder1_rotation: adj is NULL\n");
+        return;
+    }
 
     double step = (app_data->active_param == PARAM_SPECTRUM_RANGE ||
                    app_data->active_param == PARAM_WATERFALL_RANGE) ? 5.0 : 1.0;
@@ -329,6 +337,8 @@ static void on_encoder1_rotation(int direction, void *user_data) {
     // Clamp to adjustment bounds
     double lower = gtk_adjustment_get_lower(adj);
     double upper = gtk_adjustment_get_upper(adj);
+    fprintf(stderr, "on_encoder1_rotation: param=%d value=%.1f new=%.1f bounds=[%.1f,%.1f]\n",
+            app_data->active_param, value, new_value, lower, upper);
     if (new_value < lower) new_value = lower;
     if (new_value > upper) new_value = upper;
 
