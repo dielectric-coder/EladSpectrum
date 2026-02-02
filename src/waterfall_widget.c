@@ -1,6 +1,7 @@
 #include "waterfall_widget.h"
 #include <string.h>
 #include <math.h>
+#include <time.h>
 
 // Must match spectrum_widget.c margins
 #define MARGIN_LEFT 55
@@ -138,6 +139,29 @@ static void waterfall_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         cairo_move_to(cr, MARGIN_LEFT - extents.width - 5, y + 4);
         cairo_show_text(cr, label);
     }
+
+    // Draw local and UTC time at top of waterfall
+    time_t now = time(NULL);
+    struct tm local_tm, utc_tm;
+    char local_time[16], utc_time[16];
+
+    localtime_r(&now, &local_tm);
+    gmtime_r(&now, &utc_tm);
+    strftime(local_time, sizeof(local_time), "LOCAL %H:%M:%S", &local_tm);
+    strftime(utc_time, sizeof(utc_time), "UTC %H:%M:%S", &utc_tm);
+
+    cairo_set_source_rgba(cr, 0.0, 1.0, 1.0, 1.0);  // Cyan
+    cairo_set_font_size(cr, 16);
+
+    // Local time - top left
+    cairo_move_to(cr, MARGIN_LEFT + 5, 18);
+    cairo_show_text(cr, local_time);
+
+    // UTC time - top right (right-aligned)
+    cairo_text_extents_t time_extents;
+    cairo_text_extents(cr, utc_time, &time_extents);
+    cairo_move_to(cr, width - time_extents.width - 5, 18);
+    cairo_show_text(cr, utc_time);
 }
 
 static void waterfall_widget_finalize(GObject *object) {
