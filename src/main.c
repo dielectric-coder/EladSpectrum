@@ -263,14 +263,6 @@ static void on_waterfall_range_changed(GtkAdjustment *adj G_GNUC_UNUSED, gpointe
 }
 
 #ifdef HAVE_GPIOD
-// Parameter names for display
-static const char *param_names[] = {
-    "SP.REF",
-    "SP.RNG",
-    "WF.REF",
-    "WF.RNG"
-};
-
 // Get adjustment for current parameter
 static GtkAdjustment *get_active_adjustment(app_data_t *app_data) {
     switch (app_data->active_param) {

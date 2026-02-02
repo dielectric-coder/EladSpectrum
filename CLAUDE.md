@@ -107,7 +107,7 @@ Controls display parameters with independent spectrum/waterfall settings.
 - **Rotation**: Adjusts active parameter
   - Ref levels: ±1 dB per detent
   - Range: ±5 dB per detent
-- **Visual feedback**: Active parameter name displayed in cyan
+- **Visual feedback**: All four parameters displayed, active one highlighted in cyan
 
 ### Encoder 2 - Zoom/Pan Control
 
@@ -195,14 +195,20 @@ meson compile -C build
 - **Frequency Marker**: Red vertical line at tuned frequency position (from CAT)
   - Follows zoom and pan movements
   - Shows red arrow at edge when tuned frequency is panned off-screen
-- **Active Param**: Currently selected parameter for encoder 1 (Pi mode)
-- **Zoom**: Current zoom level shown in cyan (Pi mode with encoder)
 
 ### Pi Mode UI
 
-In Pi mode (`-p` flag), the control bar uses a single spinbutton that displays the value of the currently active parameter (controlled by encoder 1). This saves horizontal space on small displays. The spinbutton updates automatically when:
-- The active parameter is changed via encoder button press
-- The parameter value is adjusted via encoder rotation
+In Pi mode (`-p` flag), the control bar displays all four parameter values in a compact format:
+
+```
+● SP.REF -30  SP.RNG 120  WF.REF -30  WF.RNG 120  Zoom 1x
+```
+
+- **Status indicator**: Connection state (●/○)
+- **Parameter values**: All four shown, active parameter highlighted in cyan
+- **Zoom/Pan indicator**: Current mode and zoom level in cyan
+
+The active parameter (controlled by encoder 1 button) determines which value changes when rotating encoder 1.
 
 ## Notes
 
