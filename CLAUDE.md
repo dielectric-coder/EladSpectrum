@@ -120,6 +120,7 @@ Controls horizontal zoom and panning with mode toggle.
   - Pan resets to center when zoom changes
 - **Rotation in Pan mode**: Translates spectrum/waterfall horizontally
   - Clockwise: pan right, Counter-clockwise: pan left
+  - Step size: one grid line per detent (scales with zoom)
   - Only effective when zoom > 1x
 - **Visual feedback**: SPAN and OFS displayed in cyan (e.g., "SPAN 96  OFS +10")
   - SPAN: Visible frequency span in kHz
