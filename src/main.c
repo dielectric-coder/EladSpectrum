@@ -86,6 +86,29 @@ typedef struct {
 
 static app_data_t app;
 
+// Parse bandwidth string to Hz
+// Handles formats: "2.4k", "500", "Narrow", "Wide"
+static int parse_bandwidth_hz(const char *bw_str) {
+    if (!bw_str || bw_str[0] == '\0') return 0;
+
+    // Handle special FM bandwidth strings
+    if (strcasecmp(bw_str, "Narrow") == 0) return 2500;
+    if (strcasecmp(bw_str, "Wide") == 0) return 6000;
+
+    // Parse numeric values with optional 'k' suffix
+    char *endptr;
+    double value = strtod(bw_str, &endptr);
+    if (endptr == bw_str) return 0;  // No number found
+
+    // Check for 'k' or 'K' suffix (kHz)
+    if (*endptr == 'k' || *endptr == 'K') {
+        return (int)(value * 1000);
+    }
+
+    // Assume Hz if no suffix (values like "500" for CW)
+    return (int)value;
+}
+
 // USB data callback - called from USB thread
 static void usb_data_callback(const uint8_t *data, int length, void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
@@ -225,6 +248,11 @@ static gboolean refresh_display(gpointer user_data) {
                          app_data->current_filter);
                 spectrum_widget_set_overlay(SPECTRUM_WIDGET(app_data->spectrum),
                                             freq_str, mode_filter_str);
+
+                // Update waterfall bandwidth lines
+                int bw_hz = parse_bandwidth_hz(app_data->current_filter);
+                waterfall_widget_set_bandwidth(WATERFALL_WIDGET(app_data->waterfall),
+                                               bw_hz, app_data->current_mode);
             }
         }
     }
@@ -657,6 +685,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     // Waterfall widget (same height as spectrum)
     app_data->waterfall = waterfall_widget_new();
     gtk_widget_set_size_request(app_data->waterfall, -1, display_min_h);
+    waterfall_widget_set_sample_rate(WATERFALL_WIDGET(app_data->waterfall), DEFAULT_SAMPLE_RATE);
     // Use waterfall-specific adjustments for initial range
     float wf_ref_db = (float)gtk_adjustment_get_value(app_data->waterfall_ref_adj);
     float wf_range_db = (float)gtk_adjustment_get_value(app_data->waterfall_range_adj);

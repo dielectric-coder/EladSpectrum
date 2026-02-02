@@ -33,6 +33,14 @@ void waterfall_widget_set_pan(WaterfallWidget *widget, int pan_offset);
 // Get current pan offset
 int waterfall_widget_get_pan(WaterfallWidget *widget);
 
+// Set filter bandwidth for drawing bandwidth lines
+// bandwidth_hz: filter bandwidth in Hz
+// mode: current operating mode (for asymmetric SSB display)
+void waterfall_widget_set_bandwidth(WaterfallWidget *widget, int bandwidth_hz, int mode);
+
+// Set sample rate (needed for Hz to bin conversion)
+void waterfall_widget_set_sample_rate(WaterfallWidget *widget, int sample_rate);
+
 G_END_DECLS
 
 #endif // WATERFALL_WIDGET_H
