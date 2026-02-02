@@ -302,14 +302,9 @@ static void update_param_label(app_data_t *app_data) {
 static void update_param_spinbutton(app_data_t *app_data) {
     if (!app_data->param_spin) return;
     GtkAdjustment *adj = get_active_adjustment(app_data);
-    if (!adj) {
-        fprintf(stderr, "update_param_spinbutton: adj is NULL for param %d\n", app_data->active_param);
-        return;
-    }
+    if (!adj) return;
+    // Just update the displayed value, don't switch adjustments
     double value = gtk_adjustment_get_value(adj);
-    fprintf(stderr, "update_param_spinbutton: param=%d adj=%p value=%.1f\n",
-            app_data->active_param, (void*)adj, value);
-    gtk_spin_button_set_adjustment(GTK_SPIN_BUTTON(app_data->param_spin), adj);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(app_data->param_spin), value);
 }
 
@@ -545,8 +540,9 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
 
 #ifdef HAVE_GPIOD
     if (app_data->pi_mode) {
-        // Pi mode: single spinbutton controlled by encoder
-        app_data->param_spin = gtk_spin_button_new(app_data->ref_adj, 1.0, 0);
+        // Pi mode: single spinbutton with wide range to show any parameter
+        GtkAdjustment *spin_adj = gtk_adjustment_new(-30.0, -80.0, 150.0, 1.0, 5.0, 0.0);
+        app_data->param_spin = gtk_spin_button_new(spin_adj, 1.0, 0);
         gtk_box_append(GTK_BOX(hbox), app_data->param_spin);
 
         app_data->param_label = gtk_label_new(NULL);
