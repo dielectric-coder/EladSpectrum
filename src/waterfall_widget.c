@@ -29,9 +29,10 @@ struct _WaterfallWidget {
     int pan_offset;  // Bin offset from center (only effective when zoom > 1)
 
     // Bandwidth display
-    int bandwidth_hz;   // Filter bandwidth in Hz
-    int current_mode;   // elad_mode_t value
-    int sample_rate;    // Sample rate for Hz to bin conversion
+    int bandwidth_hz;       // Filter bandwidth in Hz
+    int current_mode;       // elad_mode_t value
+    int sample_rate;        // Sample rate for Hz to bin conversion
+    int center_offset_hz;   // Offset from tuned freq (e.g., +1500 for data modes)
 };
 
 G_DEFINE_TYPE(WaterfallWidget, waterfall_widget, GTK_TYPE_DRAWING_AREA)
@@ -129,6 +130,9 @@ static void waterfall_widget_draw(GtkDrawingArea *area, cairo_t *cr,
     // Draw bandwidth lines (red dashed) if bandwidth is set
     if (self->bandwidth_hz > 0 && self->sample_rate > 0 && self->spectrum_size > 0) {
         int center_bin = self->spectrum_size / 2;
+        // Apply center offset (e.g., +1500 Hz for data modes)
+        int offset_bins = (self->center_offset_hz * self->spectrum_size) / self->sample_rate;
+        center_bin += offset_bins;
         int bw_bins = (self->bandwidth_hz * self->spectrum_size) / self->sample_rate;
 
         // Set up dashed red line style
@@ -141,27 +145,35 @@ static void waterfall_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         int line_bins[2] = {-1, -1};  // Up to 2 lines
         int num_lines = 0;
 
-        switch (self->current_mode) {
-            case ELAD_MODE_USB:
-                // USB: signal is above carrier - one line at upper edge
-                line_bins[0] = center_bin + bw_bins;
-                num_lines = 1;
-                break;
-            case ELAD_MODE_LSB:
-                // LSB: signal is below carrier - one line at lower edge
-                line_bins[0] = center_bin - bw_bins;
-                num_lines = 1;
-                break;
-            case ELAD_MODE_CW:
-            case ELAD_MODE_CWR:
-            case ELAD_MODE_AM:
-            case ELAD_MODE_FM:
-            default:
-                // Symmetric modes: two lines around center
-                line_bins[0] = center_bin - bw_bins / 2;
-                line_bins[1] = center_bin + bw_bins / 2;
-                num_lines = 2;
-                break;
+        // Data modes (with offset) are always symmetric around the offset center
+        if (self->center_offset_hz != 0) {
+            // Symmetric around offset center (e.g., D300, D600, D1k)
+            line_bins[0] = center_bin - bw_bins / 2;
+            line_bins[1] = center_bin + bw_bins / 2;
+            num_lines = 2;
+        } else {
+            switch (self->current_mode) {
+                case ELAD_MODE_USB:
+                    // USB: signal is above carrier - one line at upper edge
+                    line_bins[0] = center_bin + bw_bins;
+                    num_lines = 1;
+                    break;
+                case ELAD_MODE_LSB:
+                    // LSB: signal is below carrier - one line at lower edge
+                    line_bins[0] = center_bin - bw_bins;
+                    num_lines = 1;
+                    break;
+                case ELAD_MODE_CW:
+                case ELAD_MODE_CWR:
+                case ELAD_MODE_AM:
+                case ELAD_MODE_FM:
+                default:
+                    // Symmetric modes: two lines around center
+                    line_bins[0] = center_bin - bw_bins / 2;
+                    line_bins[1] = center_bin + bw_bins / 2;
+                    num_lines = 2;
+                    break;
+            }
         }
 
         // Draw each bandwidth line
@@ -268,6 +280,7 @@ static void waterfall_widget_init(WaterfallWidget *self) {
     self->bandwidth_hz = 0;
     self->current_mode = ELAD_MODE_UNKNOWN;
     self->sample_rate = DEFAULT_SAMPLE_RATE;
+    self->center_offset_hz = 0;
 
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(self), waterfall_widget_draw, NULL, NULL);
 }
@@ -399,10 +412,11 @@ int waterfall_widget_get_pan(WaterfallWidget *widget) {
     return widget->pan_offset;
 }
 
-void waterfall_widget_set_bandwidth(WaterfallWidget *widget, int bandwidth_hz, int mode) {
+void waterfall_widget_set_bandwidth(WaterfallWidget *widget, int bandwidth_hz, int mode, int center_offset_hz) {
     if (!widget) return;
     widget->bandwidth_hz = bandwidth_hz;
     widget->current_mode = mode;
+    widget->center_offset_hz = center_offset_hz;
 }
 
 void waterfall_widget_set_sample_rate(WaterfallWidget *widget, int sample_rate) {

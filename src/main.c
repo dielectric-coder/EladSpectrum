@@ -86,19 +86,28 @@ typedef struct {
 
 static app_data_t app;
 
-// Parse bandwidth string to Hz
-// Handles formats: "2.4k", "500", "Narrow", "Wide"
-static int parse_bandwidth_hz(const char *bw_str) {
+// Parse bandwidth string to Hz and center offset
+// Handles formats: "2.4k", "500", "Narrow", "Wide", "D300", "D600", "D1k"
+// offset_hz: output for center frequency offset (e.g., +1500 for data modes)
+static int parse_bandwidth_hz(const char *bw_str, int *offset_hz) {
+    if (offset_hz) *offset_hz = 0;
     if (!bw_str || bw_str[0] == '\0') return 0;
 
     // Handle special FM bandwidth strings
     if (strcasecmp(bw_str, "Narrow") == 0) return 2500;
     if (strcasecmp(bw_str, "Wide") == 0) return 6000;
 
+    // Check for "D" prefix (data mode filters centered at +1500 Hz)
+    const char *num_start = bw_str;
+    if (bw_str[0] == 'D' || bw_str[0] == 'd') {
+        num_start = bw_str + 1;
+        if (offset_hz) *offset_hz = 1500;
+    }
+
     // Parse numeric values with optional 'k' suffix
     char *endptr;
-    double value = strtod(bw_str, &endptr);
-    if (endptr == bw_str) return 0;  // No number found
+    double value = strtod(num_start, &endptr);
+    if (endptr == num_start) return 0;  // No number found
 
     // Check for 'k' or 'K' suffix (kHz)
     if (*endptr == 'k' || *endptr == 'K') {
@@ -250,9 +259,10 @@ static gboolean refresh_display(gpointer user_data) {
                                             freq_str, mode_filter_str);
 
                 // Update waterfall bandwidth lines
-                int bw_hz = parse_bandwidth_hz(app_data->current_filter);
+                int offset_hz = 0;
+                int bw_hz = parse_bandwidth_hz(app_data->current_filter, &offset_hz);
                 waterfall_widget_set_bandwidth(WATERFALL_WIDGET(app_data->waterfall),
-                                               bw_hz, app_data->current_mode);
+                                               bw_hz, app_data->current_mode, offset_hz);
             }
         }
     }
