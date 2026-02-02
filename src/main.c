@@ -127,15 +127,9 @@ static int parse_bandwidth_hz(const char *bw_str, int *offset_hz, int *is_resona
 }
 
 // USB data callback - called from USB thread
-static int data_callback_count = 0;  // Debug counter
-
 static void usb_data_callback(const uint8_t *data, int length, void *user_data) {
     app_data_t *app_data = (app_data_t *)user_data;
-
-    // Debug: print every 1000th callback
-    if (++data_callback_count % 1000 == 0) {
-        fprintf(stderr, "Data callback %d, length=%d\n", data_callback_count, length);
-    }
+    (void)length;  // Unused
 
     // Process data through FFT
     if (fft_processor_process(app_data->fft, data, length)) {

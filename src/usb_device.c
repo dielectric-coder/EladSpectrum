@@ -257,17 +257,11 @@ int usb_device_set_frequency(usb_device_t *dev, long freq_hz) {
     return 0;
 }
 
-static int transfer_count = 0;  // Debug counter
-
 static void transfer_callback(struct libusb_transfer *transfer) {
     usb_device_t *dev = (usb_device_t *)transfer->user_data;
     int should_resubmit = 0;
 
     if (transfer->status == LIBUSB_TRANSFER_COMPLETED) {
-        // Debug: print every 1000th transfer
-        if (++transfer_count % 1000 == 0) {
-            fprintf(stderr, "Transfer %d completed, %d bytes\n", transfer_count, transfer->actual_length);
-        }
         if (dev->callback && dev->streaming) {
             dev->callback(transfer->buffer, transfer->actual_length, dev->callback_user_data);
         }
