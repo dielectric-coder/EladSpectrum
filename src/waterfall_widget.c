@@ -1,7 +1,6 @@
 #include "waterfall_widget.h"
 #include "usb_device.h"  // For elad_mode_t
 #include <string.h>
-#include <math.h>
 #include <time.h>
 
 // Must match spectrum_widget.c margins

@@ -40,6 +40,7 @@ This project provides a spectrum analyzer application for the Elad FDM-DUO Softw
 - RF command for filter bandwidth with mode-specific lookup tables
 - Supported modes: AM, LSB, USB, CW, FM, CW-R
 - Real-time sync with radio tuning, mode, VFO and filter changes
+- Bandwidth indicator lines on waterfall display (dashed vertical lines showing filter edges)
 
 ### Phase 3: Audio Interface (Planned)
 - Interface with the USB sound card
@@ -230,6 +231,15 @@ meson compile -C build
 - **Time Display**: Local and UTC time shown at top of waterfall
   - LOCAL HH:MM:SS at top-left
   - UTC HH:MM:SS at top-right
+- **Bandwidth Lines**: Dashed vertical lines on waterfall showing filter edges
+  - Red lines for most modes
+  - Orange lines for CW resonator modes (100&1, 100&2, 100&3, 100&4)
+  - Mode-aware positioning:
+    - USB: single line at upper filter edge
+    - LSB: single line at lower filter edge
+    - CW/AM/FM: symmetric lines around center
+    - Data modes (D300, D600, D1k): symmetric lines centered at +1500 Hz offset
+  - Lines follow zoom/pan and only appear when visible
 
 ### Pi Mode UI
 

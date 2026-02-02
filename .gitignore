@@ -1,11 +1,12 @@
 # Build directory
 build/
 
-# Editor files
+# Editor/IDE files
 *.swp
 *~
 .vscode/
 .idea/
+.cache/
 
 # Compiled objects
 *.o
