@@ -52,7 +52,7 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
     // Lock data for reading
     g_mutex_lock(&self->data_mutex);
 
-    // Draw band overlays (before grid, after background)
+    // Draw band overlays on x-axis (frequency axis at bottom)
     if (self->bandplan && self->bandplan->count > 0 && self->sample_rate > 0 && self->spectrum_size > 0) {
         // Calculate visible frequency range
         double freq_span = self->sample_rate / self->zoom_level;
@@ -66,8 +66,8 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         int num_visible = bandplan_find_visible(self->bandplan, freq_start, freq_end,
                                                  visible_indices, 32);
 
-        // Draw each visible band as orange rectangle
-        cairo_set_source_rgba(cr, 1.0, 0.5, 0.0, 0.15);  // Orange, 15% opacity
+        // Draw each visible band as orange rectangle on x-axis
+        cairo_set_source_rgba(cr, 1.0, 0.5, 0.0, 0.5);  // Orange, 50% opacity
 
         for (int i = 0; i < num_visible; i++) {
             const band_entry_t *band = &self->bandplan->bands[visible_indices[i]];
@@ -76,13 +76,13 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
             double band_start_x = plot_x + ((double)(band->lower_bound - freq_start) / freq_span) * plot_width;
             double band_end_x = plot_x + ((double)(band->upper_bound - freq_start) / freq_span) * plot_width;
 
-            // Clamp to plot area
+            // Clamp to plot area boundaries
             if (band_start_x < plot_x) band_start_x = plot_x;
             if (band_end_x > plot_x + plot_width) band_end_x = plot_x + plot_width;
 
-            // Draw rectangle
+            // Draw rectangle on x-axis area (bottom margin)
             if (band_end_x > band_start_x) {
-                cairo_rectangle(cr, band_start_x, plot_y, band_end_x - band_start_x, plot_height);
+                cairo_rectangle(cr, band_start_x, plot_y + plot_height, band_end_x - band_start_x, MARGIN_BOTTOM);
                 cairo_fill(cr);
             }
         }
