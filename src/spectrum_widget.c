@@ -66,11 +66,22 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
         int num_visible = bandplan_find_visible(self->bandplan, freq_start, freq_end,
                                                  visible_indices, 32);
 
-        // Draw each visible band as orange rectangle on x-axis
-        cairo_set_source_rgba(cr, 1.0, 0.5, 0.0, 0.5);  // Orange, 50% opacity
-
+        // Draw each visible band as colored rectangle on x-axis
         for (int i = 0; i < num_visible; i++) {
             const band_entry_t *band = &self->bandplan->bands[visible_indices[i]];
+
+            // Set color based on band type
+            switch (band->tag) {
+                case BAND_TAG_HAMRADIO:
+                    cairo_set_source_rgba(cr, 0.0, 0.8, 0.0, 0.6);  // Green
+                    break;
+                case BAND_TAG_BROADCAST:
+                    cairo_set_source_rgba(cr, 1.0, 0.5, 0.0, 0.6);  // Orange
+                    break;
+                default:
+                    cairo_set_source_rgba(cr, 0.5, 0.5, 0.5, 0.4);  // Gray for other bands
+                    break;
+            }
 
             // Convert band frequencies to pixel coordinates
             double band_start_x = plot_x + ((double)(band->lower_bound - freq_start) / freq_span) * plot_width;

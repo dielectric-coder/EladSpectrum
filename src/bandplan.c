@@ -48,12 +48,38 @@ int bandplan_load(bandplan_t *plan, const char *filepath) {
         int64_t lower = json_object_get_int_member(obj, "lower_bound");
         int64_t upper = json_object_get_int_member(obj, "upper_bound");
 
+        // Parse tags to determine band type
+        band_tag_t tag = BAND_TAG_UNKNOWN;
+        if (json_object_has_member(obj, "tags")) {
+            JsonArray *tags = json_object_get_array_member(obj, "tags");
+            if (tags) {
+                guint num_tags = json_array_get_length(tags);
+                for (guint t = 0; t < num_tags; t++) {
+                    const char *tag_str = json_array_get_string_element(tags, t);
+                    if (tag_str) {
+                        if (strcmp(tag_str, "hamradio") == 0) {
+                            tag = BAND_TAG_HAMRADIO;
+                            break;
+                        } else if (strcmp(tag_str, "broadcast") == 0) {
+                            tag = BAND_TAG_BROADCAST;
+                            break;
+                        } else if (strcmp(tag_str, "public") == 0) {
+                            tag = BAND_TAG_PUBLIC;
+                        } else if (strcmp(tag_str, "service") == 0) {
+                            tag = BAND_TAG_SERVICE;
+                        }
+                    }
+                }
+            }
+        }
+
         // Store band
         band_entry_t *band = &plan->bands[plan->count];
         strncpy(band->name, name, sizeof(band->name) - 1);
         band->name[sizeof(band->name) - 1] = '\0';
         band->lower_bound = lower;
         band->upper_bound = upper;
+        band->tag = tag;
         plan->count++;
     }
 

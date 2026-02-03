@@ -5,10 +5,19 @@
 
 #define BANDPLAN_MAX_BANDS 64
 
+typedef enum {
+    BAND_TAG_UNKNOWN = 0,
+    BAND_TAG_HAMRADIO,
+    BAND_TAG_BROADCAST,
+    BAND_TAG_PUBLIC,
+    BAND_TAG_SERVICE
+} band_tag_t;
+
 typedef struct {
     char name[32];
     int64_t lower_bound;  // Hz
     int64_t upper_bound;  // Hz
+    band_tag_t tag;
 } band_entry_t;
 
 typedef struct {
