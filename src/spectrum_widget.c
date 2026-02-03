@@ -53,10 +53,11 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
     g_mutex_lock(&self->data_mutex);
 
     // Draw band overlays on x-axis (frequency axis at bottom)
-    if (self->bandplan && self->bandplan->count > 0 && self->sample_rate > 0 && self->spectrum_size > 0) {
+    // Note: Use FFT_SIZE constant instead of spectrum_size so bands draw before data arrives
+    if (self->bandplan && self->bandplan->count > 0 && self->sample_rate > 0) {
         // Calculate visible frequency range
         double freq_span = self->sample_rate / self->zoom_level;
-        double hz_per_bin = (double)self->sample_rate / self->spectrum_size;
+        double hz_per_bin = (double)self->sample_rate / FFT_SIZE;
         double pan_hz = self->pan_offset * hz_per_bin;
         int64_t freq_start = (int64_t)(self->center_freq_hz - freq_span / 2 + pan_hz);
         int64_t freq_end = (int64_t)(self->center_freq_hz + freq_span / 2 + pan_hz);
