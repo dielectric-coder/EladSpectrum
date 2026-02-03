@@ -2,6 +2,14 @@
 
 Elad FDM-DUO Transceiver SDR Spectrum Analyzer application.
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [CLAUDE.md](CLAUDE.md) | Project overview and technical reference (this file) |
+| [USER.md](USER.md) | End user guide - installation, UI, controls, troubleshooting |
+| [DEVELOPER.md](DEVELOPER.md) | Developer guide - architecture, modules, APIs, debugging |
+
 ## Project Overview
 
 This project provides a spectrum analyzer application for the Elad FDM-DUO Software Defined Radio transceiver. The FDM-DUO exposes three USB interfaces:
