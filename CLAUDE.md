@@ -228,6 +228,40 @@ meson setup build
 meson compile -C build
 ```
 
+## Debian Package
+
+Build a .deb package for installation:
+
+```bash
+# Install build dependencies
+sudo apt install debhelper meson ninja-build libgtk-4-dev libusb-1.0-0-dev libfftw3-dev libjson-glib-dev
+
+# Build the package
+dpkg-buildpackage -us -uc -b
+
+# Install (from parent directory)
+sudo dpkg -i ../elad-spectrum_1.0.0_*.deb
+```
+
+### Package Contents
+
+- `/usr/bin/elad-spectrum` - Main executable
+- `/usr/share/elad-spectrum/bands-r1.json` - ITU Region 1 band plan
+- `/usr/share/elad-spectrum/bands-r2.json` - ITU Region 2 band plan
+- `/usr/share/elad-spectrum/bands-r3.json` - ITU Region 3 band plan
+
+### Packaging Files
+
+```
+debian/
+├── changelog    # Version history
+├── control      # Package metadata and dependencies
+├── copyright    # License information
+├── rules        # Build rules (uses meson)
+└── source/
+    └── format   # Source format (3.0 quilt)
+```
+
 ## Run
 
 ```bash
