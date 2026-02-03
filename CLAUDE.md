@@ -16,6 +16,7 @@ This project provides a spectrum analyzer application for the Elad FDM-DUO Softw
 - **GUI Framework**: GTK4
 - **FFT Library**: FFTW3
 - **USB Library**: libusb-1.0
+- **JSON Library**: json-glib (for bandplan loading)
 - **GPIO Library**: libgpiod (optional, for Raspberry Pi rotary encoder)
 - **Build System**: Meson
 
@@ -60,8 +61,11 @@ EladSpectrum/
 │   ├── fft_processor.c/h    # FFT computation with FFTW3
 │   ├── spectrum_widget.c/h  # Spectrum display GtkDrawingArea
 │   ├── waterfall_widget.c/h # Waterfall display GtkDrawingArea
+│   ├── bandplan.c/h         # Band overlay (loads JSON bandplan)
 │   ├── rotary_encoder.c/h   # GPIO rotary encoder (Pi only, optional)
 │   └── settings.c/h         # Settings persistence (load/save to config file)
+├── resources/
+│   └── bands-r1.json        # ITU Region 1 band definitions
 └── examples/                # Reference implementations
     ├── main.c               # Direct USB communication example
     ├── elad-server.c        # Network server with UDP/TCP
@@ -105,6 +109,37 @@ Display settings are automatically saved and restored on startup.
 | waterfall_range | Waterfall dynamic range (dB) | 120.0 |
 | zoom_level | Zoom level (1, 2, 4, 8, 16) | 1 |
 | pan_offset | Pan offset in FFT bins | 0 |
+
+## Band Plan Overlay
+
+The spectrum display shows colored indicators on the frequency axis for known radio bands.
+
+### Band Colors
+
+| Tag | Color | Examples |
+|-----|-------|----------|
+| hamradio | Green | 160m, 80m, 40m, 20m, 15m, 10m |
+| broadcast | Orange | AM broadcast, shortwave bands |
+| public | Gray | CB, PMR446 |
+| service | Gray | Air band, Marine VHF, ADS-B |
+
+### Band Plan File
+
+- **Development**: `./resources/bands-r1.json`
+- **Installed**: `/usr/share/elad-spectrum/bands.json`
+- **Format**: JSON array with band definitions
+
+Each band entry contains:
+```json
+{
+  "name": "40m",
+  "lower_bound": 7000000,
+  "upper_bound": 7200000,
+  "tags": ["hamradio"]
+}
+```
+
+The application searches for the development path first, then falls back to the installed path. If no bandplan file is found, band overlays are disabled with a warning message.
 
 ## Dual Rotary Encoders (Raspberry Pi)
 
@@ -170,7 +205,7 @@ Controls horizontal zoom and panning with mode toggle.
 
 ```bash
 # Debian/Ubuntu
-sudo apt install libgtk-4-dev libusb-1.0-0-dev libfftw3-dev meson ninja-build
+sudo apt install libgtk-4-dev libusb-1.0-0-dev libfftw3-dev libjson-glib-dev meson ninja-build
 
 # Raspberry Pi (optional, for rotary encoder support)
 sudo apt install libgpiod-dev
@@ -240,6 +275,12 @@ meson compile -C build
     - CW/AM/FM: symmetric lines around center
     - Data modes (D300, D600, D1k): symmetric lines centered at +1500 Hz offset
   - Lines follow zoom/pan and only appear when visible
+- **Band Overlay**: Colored rectangles on frequency axis showing radio bands
+  - Green: Amateur radio bands (e.g., 40m, 20m, 15m)
+  - Orange: Broadcast bands (e.g., AM, shortwave)
+  - Gray: Other bands (public, service)
+  - Tracks with zoom and pan
+  - Loaded from `resources/bands-r1.json` (ITU Region 1)
 
 ### Pi Mode UI
 
