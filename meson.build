@@ -38,3 +38,11 @@ executable('elad-spectrum',
   dependencies: deps,
   install: true
 )
+
+# Install band plan files
+install_data(
+  'resources/bands-r1.json',
+  'resources/bands-r2.json',
+  'resources/bands-r3.json',
+  install_dir: get_option('datadir') / 'elad-spectrum'
+)

@@ -727,7 +727,7 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     // Load bandplan for band overlay display
     // Try development path first, then installed path
     if (bandplan_load(&app_data->bandplan, "./resources/bands-r1.json") != 0) {
-        if (bandplan_load(&app_data->bandplan, "/usr/share/elad-spectrum/bands.json") != 0) {
+        if (bandplan_load(&app_data->bandplan, "/usr/share/elad-spectrum/bands-r1.json") != 0) {
             fprintf(stderr, "Bandplan: No bandplan file found, band overlays disabled\n");
         }
     }

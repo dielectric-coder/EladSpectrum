@@ -7,7 +7,8 @@ Build-Depends: debhelper-compat (= 13),
                ninja-build,
                libgtk-4-dev,
                libusb-1.0-0-dev,
-               libfftw3-dev
+               libfftw3-dev,
+               libjson-glib-dev
 Standards-Version: 4.6.2
 Rules-Requires-Root: no
 
