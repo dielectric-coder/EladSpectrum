@@ -772,7 +772,35 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     // Initialize CAT control
     app_data->cat = cat_control_new();
     if (app_data->cat) {
-        if (cat_control_open(app_data->cat, "/dev/ttyUSB0") != 0) {
+        if (cat_control_open(app_data->cat, "/dev/ttyUSB0") == 0) {
+            // Query frequency immediately on connect
+            long freq;
+            elad_mode_t mode;
+            int vfo;
+            if (cat_control_get_freq_mode(app_data->cat, &freq, &mode, &vfo) == 0) {
+                if (freq > 0) {
+                    app_data->center_freq_hz = (int)freq;
+                    app_data->current_mode = mode;
+                    app_data->current_vfo = vfo;
+
+                    // Update spectrum display
+                    spectrum_widget_set_center_freq(SPECTRUM_WIDGET(app_data->spectrum), app_data->center_freq_hz);
+
+                    // Update overlay
+                    char freq_str[32];
+                    snprintf(freq_str, sizeof(freq_str), "%.6f MHz", app_data->center_freq_hz / 1e6);
+                    spectrum_widget_set_overlay(SPECTRUM_WIDGET(app_data->spectrum), freq_str,
+                                                usb_device_mode_name(app_data->current_mode));
+
+                    // Update frame label
+                    gtk_frame_set_label(GTK_FRAME(app_data->spectrum_frame),
+                                        vfo == 0 ? "VFO A" : "VFO B");
+
+                    fprintf(stderr, "CAT: Initial frequency %.6f MHz, mode %s, VFO %c\n",
+                            freq / 1e6, usb_device_mode_name(mode), vfo == 0 ? 'A' : 'B');
+                }
+            }
+        } else {
             fprintf(stderr, "CAT: Will retry when USB connects\n");
         }
     }
