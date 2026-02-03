@@ -65,7 +65,9 @@ EladSpectrum/
 │   ├── rotary_encoder.c/h   # GPIO rotary encoder (Pi only, optional)
 │   └── settings.c/h         # Settings persistence (load/save to config file)
 ├── resources/
-│   └── bands-r1.json        # ITU Region 1 band definitions
+│   ├── bands-r1.json        # ITU Region 1 band definitions (Europe, Africa, Middle East)
+│   ├── bands-r2.json        # ITU Region 2 band definitions (Americas)
+│   └── bands-r3.json        # ITU Region 3 band definitions (Asia, Oceania)
 └── examples/                # Reference implementations
     ├── main.c               # Direct USB communication example
     ├── elad-server.c        # Network server with UDP/TCP
@@ -123,9 +125,17 @@ The spectrum display shows colored indicators on the frequency axis for known ra
 | public | Gray | CB, PMR446 |
 | service | Gray | Air band, Marine VHF, ADS-B |
 
-### Band Plan File
+### Band Plan Files
 
-- **Development**: `./resources/bands-r1.json`
+Three ITU region files are provided:
+
+| File | Region | Coverage |
+|------|--------|----------|
+| bands-r1.json | ITU Region 1 | Europe, Africa, Middle East |
+| bands-r2.json | ITU Region 2 | Americas |
+| bands-r3.json | ITU Region 3 | Asia, Oceania |
+
+- **Development**: `./resources/bands-r1.json` (default)
 - **Installed**: `/usr/share/elad-spectrum/bands.json`
 - **Format**: JSON array with band definitions
 
