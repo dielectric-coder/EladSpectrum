@@ -13,6 +13,7 @@
 #include "waterfall_widget.h"
 #include "cat_control.h"
 #include "settings.h"
+#include "bandplan.h"
 #ifdef HAVE_GPIOD
 #include "rotary_encoder.h"
 #endif
@@ -82,6 +83,9 @@ typedef struct {
 
     // Settings auto-save
     guint save_timeout_id;
+
+    // Band overlay
+    bandplan_t bandplan;
 } app_data_t;
 
 static app_data_t app;
@@ -720,6 +724,15 @@ static void activate(GtkApplication *gtk_app, gpointer user_data) {
     snprintf(freq_str, sizeof(freq_str), "%.6f MHz", app_data->center_freq_hz / 1e6);
     spectrum_widget_set_overlay(SPECTRUM_WIDGET(app_data->spectrum), freq_str, "---");
 
+    // Load bandplan for band overlay display
+    // Try development path first, then installed path
+    if (bandplan_load(&app_data->bandplan, "./resources/bands-r1.json") != 0) {
+        if (bandplan_load(&app_data->bandplan, "/usr/share/elad-spectrum/bands.json") != 0) {
+            fprintf(stderr, "Bandplan: No bandplan file found, band overlays disabled\n");
+        }
+    }
+    spectrum_widget_set_bandplan(SPECTRUM_WIDGET(app_data->spectrum), &app_data->bandplan);
+
     app_data->spectrum_frame = gtk_frame_new("VFO A");
     gtk_frame_set_child(GTK_FRAME(app_data->spectrum_frame), app_data->spectrum);
     gtk_paned_set_start_child(GTK_PANED(paned), app_data->spectrum_frame);
@@ -853,6 +866,7 @@ static void shutdown_app(GtkApplication *gtk_app G_GNUC_UNUSED, gpointer user_da
     fft_processor_free(app_data->fft);
     usb_device_free(app_data->usb);
     cat_control_free(app_data->cat);
+    bandplan_free(&app_data->bandplan);
     g_mutex_clear(&app_data->spectrum_mutex);
 }
 

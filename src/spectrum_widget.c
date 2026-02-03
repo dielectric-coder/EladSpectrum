@@ -22,6 +22,9 @@ struct _SpectrumWidget {
     // Overlay text
     char overlay_freq[32];
     char overlay_mode[16];
+
+    // Band overlay
+    const bandplan_t *bandplan;
 };
 
 G_DEFINE_TYPE(SpectrumWidget, spectrum_widget, GTK_TYPE_DRAWING_AREA)
@@ -48,6 +51,42 @@ static void spectrum_widget_draw(GtkDrawingArea *area, cairo_t *cr,
 
     // Lock data for reading
     g_mutex_lock(&self->data_mutex);
+
+    // Draw band overlays (before grid, after background)
+    if (self->bandplan && self->bandplan->count > 0 && self->sample_rate > 0 && self->spectrum_size > 0) {
+        // Calculate visible frequency range
+        double freq_span = self->sample_rate / self->zoom_level;
+        double hz_per_bin = (double)self->sample_rate / self->spectrum_size;
+        double pan_hz = self->pan_offset * hz_per_bin;
+        int64_t freq_start = (int64_t)(self->center_freq_hz - freq_span / 2 + pan_hz);
+        int64_t freq_end = (int64_t)(self->center_freq_hz + freq_span / 2 + pan_hz);
+
+        // Find visible bands
+        int visible_indices[32];
+        int num_visible = bandplan_find_visible(self->bandplan, freq_start, freq_end,
+                                                 visible_indices, 32);
+
+        // Draw each visible band as orange rectangle
+        cairo_set_source_rgba(cr, 1.0, 0.5, 0.0, 0.15);  // Orange, 15% opacity
+
+        for (int i = 0; i < num_visible; i++) {
+            const band_entry_t *band = &self->bandplan->bands[visible_indices[i]];
+
+            // Convert band frequencies to pixel coordinates
+            double band_start_x = plot_x + ((double)(band->lower_bound - freq_start) / freq_span) * plot_width;
+            double band_end_x = plot_x + ((double)(band->upper_bound - freq_start) / freq_span) * plot_width;
+
+            // Clamp to plot area
+            if (band_start_x < plot_x) band_start_x = plot_x;
+            if (band_end_x > plot_x + plot_width) band_end_x = plot_x + plot_width;
+
+            // Draw rectangle
+            if (band_end_x > band_start_x) {
+                cairo_rectangle(cr, band_start_x, plot_y, band_end_x - band_start_x, plot_height);
+                cairo_fill(cr);
+            }
+        }
+    }
 
     float range = self->max_db - self->min_db;
     if (range < 1.0f) range = 1.0f;
@@ -280,6 +319,7 @@ static void spectrum_widget_init(SpectrumWidget *self) {
     self->pan_offset = 0;
     self->overlay_freq[0] = '\0';
     self->overlay_mode[0] = '\0';
+    self->bandplan = NULL;
 
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(self), spectrum_widget_draw, NULL, NULL);
 }
@@ -372,4 +412,10 @@ void spectrum_widget_set_pan(SpectrumWidget *widget, int pan_offset) {
 int spectrum_widget_get_pan(SpectrumWidget *widget) {
     if (!widget) return 0;
     return widget->pan_offset;
+}
+
+void spectrum_widget_set_bandplan(SpectrumWidget *widget, const bandplan_t *plan) {
+    if (!widget) return;
+    widget->bandplan = plan;
+    gtk_widget_queue_draw(GTK_WIDGET(widget));
 }
